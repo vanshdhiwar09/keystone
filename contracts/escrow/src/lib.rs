@@ -2,6 +2,7 @@
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol};
 
 const JOB_CTR: Symbol = symbol_short!("JOB_CTR");
+const ADMIN: Symbol = symbol_short!("ADMIN");
 const DAY_IN_LEDGERS: u32 = 17280; // Assuming ~5s per ledger
 const TTL_THRESHOLD: u32 = 7 * DAY_IN_LEDGERS; 
 const TTL_EXTEND: u32 = 14 * DAY_IN_LEDGERS;
@@ -45,6 +46,15 @@ pub struct EscrowContract;
 
 #[contractimpl]
 impl EscrowContract {
+
+    pub fn initialize(env: Env, arbiter: Address) {
+        if env.storage().instance().has(&ADMIN) {
+            panic!("Contract already initialized");
+        }
+        env.storage().instance().set(&ADMIN, &arbiter);
+        env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
+    }
+
     pub fn create_job(
         env: Env,
         client: Address,
@@ -59,15 +69,17 @@ impl EscrowContract {
         env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
 
         let job = Job {
-            client,
-            freelancer,
-            token,
+            client: client.clone(),
+            freelancer: freelancer.clone(),
+            token: token.clone(),
             milestone_count: 0,
         };
 
         let key = DataKey::Job(job_id);
         env.storage().persistent().set(&key, &job);
         env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
+
+        env.events().publish((symbol_short!("JOB"), symbol_short!("CREATED")), job_id);
 
         job_id
     }
@@ -105,6 +117,8 @@ impl EscrowContract {
         env.storage().persistent().set(&m_key, &milestone);
         env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
+        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("ADDED")), (job_id, milestone_id, amount));
+
         milestone_id
     }
 
@@ -138,6 +152,8 @@ impl EscrowContract {
         env.storage().persistent().set(&m_key, &milestone);
         env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
         env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+
+        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("FUNDED")), (job_id, milestone_id));
     }
 
     pub fn submit_milestone(
@@ -166,6 +182,8 @@ impl EscrowContract {
         env.storage().persistent().set(&m_key, &milestone);
         env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
         env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+
+        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("SUBMITTED")), (job_id, milestone_id));
     }
 
     pub fn approve_milestone(
@@ -194,6 +212,77 @@ impl EscrowContract {
         env.storage().persistent().set(&m_key, &milestone);
         env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
         env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+
+        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("APPROVED")), (job_id, milestone_id));
+    }
+
+    pub fn raise_dispute(
+        env: Env,
+        caller: Address,
+        job_id: u32,
+        milestone_id: u32,
+    ) {
+        caller.require_auth();
+
+        let job_key = DataKey::Job(job_id);
+        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+
+        if caller != job.client && caller != job.freelancer {
+            panic!("Only the client or freelancer can raise a dispute");
+        }
+
+        let m_key = DataKey::Milestone(job_id, milestone_id);
+        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+
+        if milestone.status != Status::Funded && milestone.status != Status::Submitted && milestone.status != Status::Approved {
+            panic!("Milestone not in a disputable state");
+        }
+
+        milestone.status = Status::Disputed;
+        env.storage().persistent().set(&m_key, &milestone);
+        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+
+        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("DISPUTED")), (job_id, milestone_id));
+    }
+
+    pub fn resolve_dispute(
+        env: Env,
+        caller: Address,
+        job_id: u32,
+        milestone_id: u32,
+        release_funds: bool,
+    ) {
+        caller.require_auth();
+
+        let arbiter: Address = env.storage().instance().get(&ADMIN).expect("Contract uninitialized");
+        if caller != arbiter {
+            panic!("Only the arbiter can resolve disputes");
+        }
+
+        let job_key = DataKey::Job(job_id);
+        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+
+        let m_key = DataKey::Milestone(job_id, milestone_id);
+        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+
+        if milestone.status != Status::Disputed {
+            panic!("Milestone is not Disputed");
+        }
+
+        if release_funds {
+            milestone.status = Status::Approved;
+        } else {
+            let token_client = token::Client::new(&env, &job.token);
+            token_client.transfer(&env.current_contract_address(), &job.client, &milestone.amount);
+            milestone.status = Status::Refunded;
+        }
+
+        env.storage().persistent().set(&m_key, &milestone);
+        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+
+        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("RESOLVED")), (job_id, milestone_id, release_funds));
     }
 
     pub fn get_job(env: Env, job_id: u32) -> Job {

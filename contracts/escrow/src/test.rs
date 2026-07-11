@@ -15,6 +15,8 @@ fn test_create_job_and_milestones() {
 
     let contract_id = env.register(EscrowContract, ());
     let client = EscrowContractClient::new(&env, &contract_id);
+    let arbiter = Address::generate(&env);
+    client.initialize(&arbiter);
 
     let client_addr = Address::generate(&env);
     let freelancer_addr = Address::generate(&env);
@@ -71,6 +73,8 @@ fn test_unauthorized_add_milestone() {
 
     let contract_id = env.register(EscrowContract, ());
     let client = EscrowContractClient::new(&env, &contract_id);
+    let arbiter = Address::generate(&env);
+    client.initialize(&arbiter);
 
     let client_addr = Address::generate(&env);
     let freelancer_addr = Address::generate(&env);
@@ -92,6 +96,8 @@ fn test_unauthorized_submit_milestone() {
 
     let contract_id = env.register(EscrowContract, ());
     let client = EscrowContractClient::new(&env, &contract_id);
+    let arbiter = Address::generate(&env);
+    client.initialize(&arbiter);
 
     let client_addr = Address::generate(&env);
     let freelancer_addr = Address::generate(&env);
@@ -118,6 +124,8 @@ fn test_double_fund_milestone() {
 
     let contract_id = env.register(EscrowContract, ());
     let client = EscrowContractClient::new(&env, &contract_id);
+    let arbiter = Address::generate(&env);
+    client.initialize(&arbiter);
 
     let client_addr = Address::generate(&env);
     let freelancer_addr = Address::generate(&env);
@@ -135,4 +143,98 @@ fn test_double_fund_milestone() {
 
     // Fund twice - should panic
     client.fund_milestone(&client_addr, &job_id, &m1_id);
+}
+
+#[test]
+fn test_dispute_and_refund() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(EscrowContract, ());
+    let client = EscrowContractClient::new(&env, &contract_id);
+    let arbiter = Address::generate(&env);
+    client.initialize(&arbiter);
+
+    let client_addr = Address::generate(&env);
+    let freelancer_addr = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token.address);
+    token_admin_client.mint(&client_addr, &1000);
+
+    let job_id = client.create_job(&client_addr, &freelancer_addr, &token.address);
+    let m1_id = client.add_milestone(&client_addr, &job_id, &1000);
+
+    client.fund_milestone(&client_addr, &job_id, &m1_id);
+    
+    // Freelancer raises a dispute
+    client.raise_dispute(&freelancer_addr, &job_id, &m1_id);
+    assert_eq!(client.get_milestone(&job_id, &m1_id).status, Status::Disputed);
+
+    // Arbiter uniquely resolves dispute and refunds back to client natively
+    client.resolve_dispute(&arbiter, &job_id, &m1_id, &false);
+    assert_eq!(client.get_milestone(&job_id, &m1_id).status, Status::Refunded);
+
+    // Assets returned
+    assert_eq!(token.balance(&client_addr), 1000);
+    assert_eq!(token.balance(&contract_id), 0);
+}
+
+#[test]
+fn test_dispute_and_release_to_approved() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(EscrowContract, ());
+    let client = EscrowContractClient::new(&env, &contract_id);
+    let arbiter = Address::generate(&env);
+    client.initialize(&arbiter);
+
+    let client_addr = Address::generate(&env);
+    let freelancer_addr = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token.address);
+    token_admin_client.mint(&client_addr, &1000);
+
+    let job_id = client.create_job(&client_addr, &freelancer_addr, &token.address);
+    let m1_id = client.add_milestone(&client_addr, &job_id, &1000);
+
+    client.fund_milestone(&client_addr, &job_id, &m1_id);
+    client.submit_milestone(&freelancer_addr, &job_id, &m1_id);
+    
+    client.raise_dispute(&client_addr, &job_id, &m1_id);
+    assert_eq!(client.get_milestone(&job_id, &m1_id).status, Status::Disputed);
+
+    // Arbiter resolves dispute forwarding payment via 'Approved' fallback to Fee Router explicitly later
+    client.resolve_dispute(&arbiter, &job_id, &m1_id, &true);
+    assert_eq!(client.get_milestone(&job_id, &m1_id).status, Status::Approved);
+
+    // Contract retains funds waiting for Fee router release chain
+    assert_eq!(token.balance(&contract_id), 1000);
+}
+
+#[test]
+#[should_panic(expected = "Only the arbiter can resolve disputes")]
+fn test_unauthorized_resolve_dispute_by_client() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(EscrowContract, ());
+    let client = EscrowContractClient::new(&env, &contract_id);
+    let arbiter = Address::generate(&env);
+    client.initialize(&arbiter);
+
+    let client_addr = Address::generate(&env);
+    let freelancer_addr = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token.address);
+    token_admin_client.mint(&client_addr, &1000);
+
+    let job_id = client.create_job(&client_addr, &freelancer_addr, &token.address);
+    let m1_id = client.add_milestone(&client_addr, &job_id, &1000);
+
+    client.fund_milestone(&client_addr, &job_id, &m1_id);
+    client.raise_dispute(&client_addr, &job_id, &m1_id);
+    
+    // Ensure Client explicitly fails trying to arbitrate their own node
+    client.resolve_dispute(&client_addr, &job_id, &m1_id, &true);
 }
