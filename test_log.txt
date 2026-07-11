@@ -1,0 +1,66 @@
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+  --> contracts\escrow\src\lib.rs:85:22
+   |
+85 | ...   env.events().publish((symbol_short!("JO...
+   |                    ^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:123:22
+    |
+123 | ...   env.events().publish((symbol_short!("M...
+    |                    ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:159:22
+    |
+159 | ...   env.events().publish((symbol_short!("M...
+    |                    ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:189:22
+    |
+189 | ...   env.events().publish((symbol_short!("M...
+    |                    ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:219:22
+    |
+219 | ...   env.events().publish((symbol_short!("M...
+    |                    ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:249:22
+    |
+249 | ...   env.events().publish((symbol_short!("M...
+    |                    ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:288:22
+    |
+288 | ...   env.events().publish((symbol_short!("M...
+    |                    ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:326:22
+    |
+326 | ...   env.events().publish((symbol_short!("M...
+    |                    ^^^^^^^
+
+warning: `escrow` (lib test) generated 8 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src\lib.rs (target\debug\deps\escrow-6ca0f67b36b5e168.exe)
+
+running 8 tests
+test test::test_fee_router_unauthorized_route_funds - should panic ... ok
+test test::test_unauthorized_add_milestone - should panic ... ok
+test test::test_unauthorized_submit_milestone - should panic ... ok
+test test::test_distribute_without_router - should panic ... ok
+test test::test_dispute_and_release_to_approved ... ok
+test test::test_dispute_and_refund ... ok
+test test::test_create_job_and_milestones ... ok
+test test::test_double_distribute_milestone - should panic ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+

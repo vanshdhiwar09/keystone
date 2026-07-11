@@ -1,8 +1,10 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol};
+use fee_router::FeeRouterContractClient;
 
 const JOB_CTR: Symbol = symbol_short!("JOB_CTR");
 const ADMIN: Symbol = symbol_short!("ADMIN");
+const ROUTER_ADDR: Symbol = symbol_short!("ROUTER");
 const DAY_IN_LEDGERS: u32 = 17280; // Assuming ~5s per ledger
 const TTL_THRESHOLD: u32 = 7 * DAY_IN_LEDGERS; 
 const TTL_EXTEND: u32 = 14 * DAY_IN_LEDGERS;
@@ -47,11 +49,12 @@ pub struct EscrowContract;
 #[contractimpl]
 impl EscrowContract {
 
-    pub fn initialize(env: Env, arbiter: Address) {
+    pub fn initialize(env: Env, arbiter: Address, fee_router: Address) {
         if env.storage().instance().has(&ADMIN) {
             panic!("Contract already initialized");
         }
         env.storage().instance().set(&ADMIN, &arbiter);
+        env.storage().instance().set(&ROUTER_ADDR, &fee_router);
         env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
     }
 
@@ -283,6 +286,44 @@ impl EscrowContract {
         env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
         env.events().publish((symbol_short!("MILESTONE"), symbol_short!("RESOLVED")), (job_id, milestone_id, release_funds));
+    }
+
+    pub fn distribute_milestone(
+        env: Env,
+        job_id: u32,
+        milestone_id: u32,
+    ) {
+        // Anyone can call this securely (permissionless trigger tracking endpoints statically).
+        let router: Address = env.storage().instance().get(&ROUTER_ADDR).expect("Fee router is not initialized");
+
+        let job_key = DataKey::Job(job_id);
+        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+
+        let m_key = DataKey::Milestone(job_id, milestone_id);
+        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+
+        if milestone.status != Status::Approved {
+            panic!("Milestone is not Approved");
+        }
+
+        let token_client = token::Client::new(&env, &job.token);
+
+        // Soroban execution is strictly atomic.
+        // We confidently transfer the exact milestone.amount directly from Escrow to the FeeRouter here first natively!
+        // If the downstream cross-contract `route_funds` call fails or panics, the entire transaction rolls back including this prior token transfer seamlessly. No leaks!
+        token_client.transfer(&env.current_contract_address(), &router, &milestone.amount);
+
+        // Generated Compile-Bound Integration Cross-Contract Invocation Safely Check-Pointing
+        let router_client = FeeRouterContractClient::new(&env, &router);
+        router_client.route_funds(&job.token, &job.freelancer, &milestone.amount);
+
+        milestone.status = Status::Released;
+        
+        env.storage().persistent().set(&m_key, &milestone);
+        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+
+        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("RELEASED")), (job_id, milestone_id));
     }
 
     pub fn get_job(env: Env, job_id: u32) -> Job {

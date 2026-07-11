@@ -14,3 +14,6 @@ To interact with this dApp (once running):
 ```bash
 cargo update -p ed25519-dalek --precise 2.2.0
 ```
+
+## Security Note: Permissionless Execution
+Because `distribute_milestone` restricts token fallback flows exclusively to the cryptographically locked destination paths stored directly natively in the contract state, we designed this endpoint inherently permissionless — allowing any party (crank or network actor) to trigger the resolution flawlessly without natively introducing any asset vulnerabilities.

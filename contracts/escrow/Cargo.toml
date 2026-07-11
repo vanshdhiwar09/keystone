@@ -10,6 +10,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+fee-router = { path = "../fee-router" }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
