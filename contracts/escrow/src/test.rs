@@ -4,8 +4,8 @@ use super::*;
 use soroban_sdk::{Env, testutils::Address as _, token};
 
 fn create_token_contract<'a>(env: &Env, admin: &Address) -> token::Client<'a> {
-    let token_address = env.register_stellar_asset_contract(admin.clone());
-    token::Client::new(env, &token_address)
+    let sac = env.register_stellar_asset_contract_v2(admin.clone());
+    token::Client::new(env, &sac.address())
 }
 
 #[test]
@@ -108,4 +108,31 @@ fn test_unauthorized_submit_milestone() {
 
     // Try to submit milestone as the client (should be freelancer)
     client.submit_milestone(&client_addr, &job_id, &m1_id);
+}
+
+#[test]
+#[should_panic(expected = "Milestone is not in Created status")]
+fn test_double_fund_milestone() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(EscrowContract, ());
+    let client = EscrowContractClient::new(&env, &contract_id);
+
+    let client_addr = Address::generate(&env);
+    let freelancer_addr = Address::generate(&env);
+    
+    let token_admin = Address::generate(&env);
+    let token = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token.address);
+    token_admin_client.mint(&client_addr, &2000);
+
+    let job_id = client.create_job(&client_addr, &freelancer_addr, &token.address);
+    let m1_id = client.add_milestone(&client_addr, &job_id, &1000);
+
+    // Fund once
+    client.fund_milestone(&client_addr, &job_id, &m1_id);
+
+    // Fund twice - should panic
+    client.fund_milestone(&client_addr, &job_id, &m1_id);
 }
