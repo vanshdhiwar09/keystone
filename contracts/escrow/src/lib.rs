@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol};
 
 const JOB_CTR: Symbol = symbol_short!("JOB_CTR");
 const DAY_IN_LEDGERS: u32 = 17280; // Assuming ~5s per ledger
@@ -23,6 +23,7 @@ pub enum Status {
 pub struct Job {
     pub client: Address,
     pub freelancer: Address,
+    pub token: Address,
     pub milestone_count: u32,
 }
 
@@ -48,6 +49,7 @@ impl EscrowContract {
         env: Env,
         client: Address,
         freelancer: Address,
+        token: Address,
     ) -> u32 {
         client.require_auth();
 
@@ -59,6 +61,7 @@ impl EscrowContract {
         let job = Job {
             client,
             freelancer,
+            token,
             milestone_count: 0,
         };
 
@@ -103,6 +106,94 @@ impl EscrowContract {
         env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
         milestone_id
+    }
+
+    pub fn fund_milestone(
+        env: Env,
+        client: Address,
+        job_id: u32,
+        milestone_id: u32,
+    ) {
+        client.require_auth();
+
+        let job_key = DataKey::Job(job_id);
+        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+        
+        if client != job.client {
+            panic!("Only the client can fund milestones to this job");
+        }
+
+        let m_key = DataKey::Milestone(job_id, milestone_id);
+        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+
+        if milestone.status != Status::Created {
+            panic!("Milestone is not in Created status");
+        }
+
+        let token_client = token::Client::new(&env, &job.token);
+        token_client.transfer(&client, &env.current_contract_address(), &milestone.amount);
+
+        milestone.status = Status::Funded;
+        
+        env.storage().persistent().set(&m_key, &milestone);
+        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+    }
+
+    pub fn submit_milestone(
+        env: Env,
+        freelancer: Address,
+        job_id: u32,
+        milestone_id: u32,
+    ) {
+        freelancer.require_auth();
+
+        let job_key = DataKey::Job(job_id);
+        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+
+        if freelancer != job.freelancer {
+            panic!("Only the freelancer can submit work");
+        }
+
+        let m_key = DataKey::Milestone(job_id, milestone_id);
+        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+
+        if milestone.status != Status::Funded {
+            panic!("Milestone is not Funded");
+        }
+
+        milestone.status = Status::Submitted;
+        env.storage().persistent().set(&m_key, &milestone);
+        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+    }
+
+    pub fn approve_milestone(
+        env: Env,
+        client: Address,
+        job_id: u32,
+        milestone_id: u32,
+    ) {
+        client.require_auth();
+
+        let job_key = DataKey::Job(job_id);
+        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+
+        if client != job.client {
+            panic!("Only the client can approve work");
+        }
+
+        let m_key = DataKey::Milestone(job_id, milestone_id);
+        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+
+        if milestone.status != Status::Submitted {
+            panic!("Milestone is not Submitted");
+        }
+
+        milestone.status = Status::Approved;
+        env.storage().persistent().set(&m_key, &milestone);
+        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
     }
 
     pub fn get_job(env: Env, job_id: u32) -> Job {
