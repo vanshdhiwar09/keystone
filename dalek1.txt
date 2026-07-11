@@ -1,0 +1,9 @@
+ed25519-dalek v2.2.0
+└── soroban-sdk v26.1.0
+    ├── escrow v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\escrow)
+    ├── fee-router v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\fee-router)
+    └── payout v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\payout)
+    [dev-dependencies]
+    ├── escrow v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\escrow)
+    ├── fee-router v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\fee-router)
+    └── payout v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\payout)
