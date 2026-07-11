@@ -1,0 +1,14 @@
+# Rust
+/target
+Cargo.lock
+
+# Node
+/frontend/node_modules/
+/frontend/.next/
+/frontend/out/
+/frontend/build/
+.env
+.env.local
+
+# OSX
+.DS_Store
