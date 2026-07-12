@@ -1,13 +1,32 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol};
 use fee_router::FeeRouterContractClient;
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol,
+};
 
 const JOB_CTR: Symbol = symbol_short!("JOB_CTR");
 const ADMIN: Symbol = symbol_short!("ADMIN");
 const ROUTER_ADDR: Symbol = symbol_short!("ROUTER");
 const DAY_IN_LEDGERS: u32 = 17280; // Assuming ~5s per ledger
-const TTL_THRESHOLD: u32 = 7 * DAY_IN_LEDGERS; 
+const TTL_THRESHOLD: u32 = 7 * DAY_IN_LEDGERS;
 const TTL_EXTEND: u32 = 14 * DAY_IN_LEDGERS;
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum EscrowError {
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
+    JobNotFound = 3,
+    MilestoneNotFound = 4,
+    InvalidAmount = 5,
+    SelfDealing = 6,
+    NotAuthorizedClient = 7,
+    NotAuthorizedFreelancer = 8,
+    NotAuthorizedParticipant = 9,
+    NotAuthorizedArbiter = 10,
+    InvalidStatus = 11,
+}
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -48,14 +67,16 @@ pub struct EscrowContract;
 
 #[contractimpl]
 impl EscrowContract {
-
-    pub fn initialize(env: Env, arbiter: Address, fee_router: Address) {
+    pub fn initialize(env: Env, arbiter: Address, fee_router: Address) -> Result<(), EscrowError> {
         if env.storage().instance().has(&ADMIN) {
-            panic!("Contract already initialized");
+            return Err(EscrowError::AlreadyInitialized);
         }
         env.storage().instance().set(&ADMIN, &arbiter);
         env.storage().instance().set(&ROUTER_ADDR, &fee_router);
-        env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .instance()
+            .extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
+        Ok(())
     }
 
     pub fn create_job(
@@ -63,13 +84,19 @@ impl EscrowContract {
         client: Address,
         freelancer: Address,
         token: Address,
-    ) -> u32 {
+    ) -> Result<u32, EscrowError> {
         client.require_auth();
+
+        if client == freelancer {
+            return Err(EscrowError::SelfDealing);
+        }
 
         let mut job_id: u32 = env.storage().instance().get(&JOB_CTR).unwrap_or(0);
         job_id += 1;
         env.storage().instance().set(&JOB_CTR, &job_id);
-        env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .instance()
+            .extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
 
         let job = Job {
             client: client.clone(),
@@ -80,37 +107,46 @@ impl EscrowContract {
 
         let key = DataKey::Job(job_id);
         env.storage().persistent().set(&key, &job);
-        env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
 
-        env.events().publish((symbol_short!("JOB"), symbol_short!("CREATED")), job_id);
+        env.events()
+            .publish((symbol_short!("JOB"), symbol_short!("CREATED")), job_id);
 
-        job_id
+        Ok(job_id)
     }
-    
+
     pub fn add_milestone(
         env: Env,
         client: Address,
         job_id: u32,
         amount: i128,
-    ) -> u32 {
+    ) -> Result<u32, EscrowError> {
         client.require_auth();
 
         if amount <= 0 {
-            panic!("Amount must be greater than zero");
+            return Err(EscrowError::InvalidAmount);
         }
 
         let key = DataKey::Job(job_id);
-        let mut job: Job = env.storage().persistent().get(&key).expect("Job not found");
-        
+        let mut job: Job = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(EscrowError::JobNotFound)?;
+
         if client != job.client {
-            panic!("Only the client can add milestones to this job");
+            return Err(EscrowError::NotAuthorizedClient);
         }
 
         job.milestone_count += 1;
         let milestone_id = job.milestone_count;
 
         env.storage().persistent().set(&key, &job);
-        env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
 
         let m_key = DataKey::Milestone(job_id, milestone_id);
         let milestone = Milestone {
@@ -118,11 +154,16 @@ impl EscrowContract {
             status: Status::Created,
         };
         env.storage().persistent().set(&m_key, &milestone);
-        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
-        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("ADDED")), (job_id, milestone_id, amount));
+        env.events().publish(
+            (symbol_short!("MILESTONE"), symbol_short!("ADDED")),
+            (job_id, milestone_id, amount),
+        );
 
-        milestone_id
+        Ok(milestone_id)
     }
 
     pub fn fund_milestone(
@@ -130,33 +171,49 @@ impl EscrowContract {
         client: Address,
         job_id: u32,
         milestone_id: u32,
-    ) {
+    ) -> Result<(), EscrowError> {
         client.require_auth();
 
         let job_key = DataKey::Job(job_id);
-        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
-        
+        let job: Job = env
+            .storage()
+            .persistent()
+            .get(&job_key)
+            .ok_or(EscrowError::JobNotFound)?;
+
         if client != job.client {
-            panic!("Only the client can fund milestones to this job");
+            return Err(EscrowError::NotAuthorizedClient);
         }
 
         let m_key = DataKey::Milestone(job_id, milestone_id);
-        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+        let mut milestone: Milestone = env
+            .storage()
+            .persistent()
+            .get(&m_key)
+            .ok_or(EscrowError::MilestoneNotFound)?;
 
         if milestone.status != Status::Created {
-            panic!("Milestone is not in Created status");
+            return Err(EscrowError::InvalidStatus);
         }
 
         let token_client = token::Client::new(&env, &job.token);
         token_client.transfer(&client, &env.current_contract_address(), &milestone.amount);
 
         milestone.status = Status::Funded;
-        
-        env.storage().persistent().set(&m_key, &milestone);
-        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
-        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
-        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("FUNDED")), (job_id, milestone_id));
+        env.storage().persistent().set(&m_key, &milestone);
+        env.storage()
+            .persistent()
+            .extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+
+        env.events().publish(
+            (symbol_short!("MILESTONE"), symbol_short!("FUNDED")),
+            (job_id, milestone_id),
+        );
+        Ok(())
     }
 
     pub fn submit_milestone(
@@ -164,29 +221,45 @@ impl EscrowContract {
         freelancer: Address,
         job_id: u32,
         milestone_id: u32,
-    ) {
+    ) -> Result<(), EscrowError> {
         freelancer.require_auth();
 
         let job_key = DataKey::Job(job_id);
-        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+        let job: Job = env
+            .storage()
+            .persistent()
+            .get(&job_key)
+            .ok_or(EscrowError::JobNotFound)?;
 
         if freelancer != job.freelancer {
-            panic!("Only the freelancer can submit work");
+            return Err(EscrowError::NotAuthorizedFreelancer);
         }
 
         let m_key = DataKey::Milestone(job_id, milestone_id);
-        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+        let mut milestone: Milestone = env
+            .storage()
+            .persistent()
+            .get(&m_key)
+            .ok_or(EscrowError::MilestoneNotFound)?;
 
         if milestone.status != Status::Funded {
-            panic!("Milestone is not Funded");
+            return Err(EscrowError::InvalidStatus);
         }
 
         milestone.status = Status::Submitted;
         env.storage().persistent().set(&m_key, &milestone);
-        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
-        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
-        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("SUBMITTED")), (job_id, milestone_id));
+        env.events().publish(
+            (symbol_short!("MILESTONE"), symbol_short!("SUBMITTED")),
+            (job_id, milestone_id),
+        );
+        Ok(())
     }
 
     pub fn approve_milestone(
@@ -194,29 +267,45 @@ impl EscrowContract {
         client: Address,
         job_id: u32,
         milestone_id: u32,
-    ) {
+    ) -> Result<(), EscrowError> {
         client.require_auth();
 
         let job_key = DataKey::Job(job_id);
-        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+        let job: Job = env
+            .storage()
+            .persistent()
+            .get(&job_key)
+            .ok_or(EscrowError::JobNotFound)?;
 
         if client != job.client {
-            panic!("Only the client can approve work");
+            return Err(EscrowError::NotAuthorizedClient);
         }
 
         let m_key = DataKey::Milestone(job_id, milestone_id);
-        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+        let mut milestone: Milestone = env
+            .storage()
+            .persistent()
+            .get(&m_key)
+            .ok_or(EscrowError::MilestoneNotFound)?;
 
         if milestone.status != Status::Submitted {
-            panic!("Milestone is not Submitted");
+            return Err(EscrowError::InvalidStatus);
         }
 
         milestone.status = Status::Approved;
         env.storage().persistent().set(&m_key, &milestone);
-        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
-        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
-        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("APPROVED")), (job_id, milestone_id));
+        env.events().publish(
+            (symbol_short!("MILESTONE"), symbol_short!("APPROVED")),
+            (job_id, milestone_id),
+        );
+        Ok(())
     }
 
     pub fn raise_dispute(
@@ -224,29 +313,48 @@ impl EscrowContract {
         caller: Address,
         job_id: u32,
         milestone_id: u32,
-    ) {
+    ) -> Result<(), EscrowError> {
         caller.require_auth();
 
         let job_key = DataKey::Job(job_id);
-        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+        let job: Job = env
+            .storage()
+            .persistent()
+            .get(&job_key)
+            .ok_or(EscrowError::JobNotFound)?;
 
         if caller != job.client && caller != job.freelancer {
-            panic!("Only the client or freelancer can raise a dispute");
+            return Err(EscrowError::NotAuthorizedParticipant);
         }
 
         let m_key = DataKey::Milestone(job_id, milestone_id);
-        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+        let mut milestone: Milestone = env
+            .storage()
+            .persistent()
+            .get(&m_key)
+            .ok_or(EscrowError::MilestoneNotFound)?;
 
-        if milestone.status != Status::Funded && milestone.status != Status::Submitted && milestone.status != Status::Approved {
-            panic!("Milestone not in a disputable state");
+        if milestone.status != Status::Funded
+            && milestone.status != Status::Submitted
+            && milestone.status != Status::Approved
+        {
+            return Err(EscrowError::InvalidStatus);
         }
 
         milestone.status = Status::Disputed;
         env.storage().persistent().set(&m_key, &milestone);
-        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
-        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
-        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("DISPUTED")), (job_id, milestone_id));
+        env.events().publish(
+            (symbol_short!("MILESTONE"), symbol_short!("DISPUTED")),
+            (job_id, milestone_id),
+        );
+        Ok(())
     }
 
     pub fn resolve_dispute(
@@ -255,89 +363,143 @@ impl EscrowContract {
         job_id: u32,
         milestone_id: u32,
         release_funds: bool,
-    ) {
+    ) -> Result<(), EscrowError> {
         caller.require_auth();
 
-        let arbiter: Address = env.storage().instance().get(&ADMIN).expect("Contract uninitialized");
+        let arbiter: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN)
+            .ok_or(EscrowError::NotInitialized)?;
         if caller != arbiter {
-            panic!("Only the arbiter can resolve disputes");
+            return Err(EscrowError::NotAuthorizedArbiter);
         }
 
         let job_key = DataKey::Job(job_id);
-        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+        let job: Job = env
+            .storage()
+            .persistent()
+            .get(&job_key)
+            .ok_or(EscrowError::JobNotFound)?;
 
         let m_key = DataKey::Milestone(job_id, milestone_id);
-        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+        let mut milestone: Milestone = env
+            .storage()
+            .persistent()
+            .get(&m_key)
+            .ok_or(EscrowError::MilestoneNotFound)?;
 
         if milestone.status != Status::Disputed {
-            panic!("Milestone is not Disputed");
+            return Err(EscrowError::InvalidStatus);
         }
 
         if release_funds {
             milestone.status = Status::Approved;
         } else {
             let token_client = token::Client::new(&env, &job.token);
-            token_client.transfer(&env.current_contract_address(), &job.client, &milestone.amount);
+            token_client.transfer(
+                &env.current_contract_address(),
+                &job.client,
+                &milestone.amount,
+            );
             milestone.status = Status::Refunded;
         }
 
         env.storage().persistent().set(&m_key, &milestone);
-        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
-        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
-        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("RESOLVED")), (job_id, milestone_id, release_funds));
+        env.events().publish(
+            (symbol_short!("MILESTONE"), symbol_short!("RESOLVED")),
+            (job_id, milestone_id, release_funds),
+        );
+        Ok(())
     }
 
     pub fn distribute_milestone(
         env: Env,
         job_id: u32,
         milestone_id: u32,
-    ) {
-        // Anyone can call this securely (permissionless trigger tracking endpoints statically).
-        let router: Address = env.storage().instance().get(&ROUTER_ADDR).expect("Fee router is not initialized");
+    ) -> Result<(), EscrowError> {
+        let router: Address = env
+            .storage()
+            .instance()
+            .get(&ROUTER_ADDR)
+            .ok_or(EscrowError::NotInitialized)?;
 
         let job_key = DataKey::Job(job_id);
-        let job: Job = env.storage().persistent().get(&job_key).expect("Job not found");
+        let job: Job = env
+            .storage()
+            .persistent()
+            .get(&job_key)
+            .ok_or(EscrowError::JobNotFound)?;
 
         let m_key = DataKey::Milestone(job_id, milestone_id);
-        let mut milestone: Milestone = env.storage().persistent().get(&m_key).expect("Milestone not found");
+        let mut milestone: Milestone = env
+            .storage()
+            .persistent()
+            .get(&m_key)
+            .ok_or(EscrowError::MilestoneNotFound)?;
 
         if milestone.status != Status::Approved {
-            panic!("Milestone is not Approved");
+            return Err(EscrowError::InvalidStatus);
         }
 
         let token_client = token::Client::new(&env, &job.token);
-
-        // Soroban execution is strictly atomic.
-        // We confidently transfer the exact milestone.amount directly from Escrow to the FeeRouter here first natively!
-        // If the downstream cross-contract `route_funds` call fails or panics, the entire transaction rolls back including this prior token transfer seamlessly. No leaks!
         token_client.transfer(&env.current_contract_address(), &router, &milestone.amount);
 
-        // Generated Compile-Bound Integration Cross-Contract Invocation Safely Check-Pointing
         let router_client = FeeRouterContractClient::new(&env, &router);
         router_client.route_funds(&job.token, &job.freelancer, &milestone.amount);
 
         milestone.status = Status::Released;
-        
+
         env.storage().persistent().set(&m_key, &milestone);
-        env.storage().persistent().extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
-        env.storage().persistent().extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&job_key, TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .persistent()
+            .extend_ttl(&m_key, TTL_THRESHOLD, TTL_EXTEND);
 
-        env.events().publish((symbol_short!("MILESTONE"), symbol_short!("RELEASED")), (job_id, milestone_id));
+        env.events().publish(
+            (symbol_short!("MILESTONE"), symbol_short!("RELEASED")),
+            (job_id, milestone_id),
+        );
+        Ok(())
     }
 
-    pub fn get_job(env: Env, job_id: u32) -> Job {
+    pub fn get_job(env: Env, job_id: u32) -> Result<Job, EscrowError> {
         let key = DataKey::Job(job_id);
-        let job: Job = env.storage().persistent().get(&key).expect("Job not found");
-        env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
-        job
+        let job: Job = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(EscrowError::JobNotFound)?;
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
+        Ok(job)
     }
 
-    pub fn get_milestone(env: Env, job_id: u32, milestone_id: u32) -> Milestone {
+    pub fn get_milestone(
+        env: Env,
+        job_id: u32,
+        milestone_id: u32,
+    ) -> Result<Milestone, EscrowError> {
         let key = DataKey::Milestone(job_id, milestone_id);
-        let milestone: Milestone = env.storage().persistent().get(&key).expect("Milestone not found");
-        env.storage().persistent().extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
-        milestone
+        let milestone: Milestone = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(EscrowError::MilestoneNotFound)?;
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
+        Ok(milestone)
     }
 }
 

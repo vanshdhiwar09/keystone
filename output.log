@@ -1,0 +1,158 @@
+   Compiling fee-router v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\fee-router)
+   Compiling payout v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\payout)
+   Compiling escrow v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\escrow)
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:115:14
+    |
+115 |             .publish((symbol_short!("JOB"), symbol_short!("CREATED")), job_id);
+    |              ^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:161:22
+    |
+161 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:212:22
+    |
+212 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:258:22
+    |
+258 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:304:22
+    |
+304 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:353:22
+    |
+353 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:416:22
+    |
+416 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:468:22
+    |
+468 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: `escrow` (lib test) generated 8 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.39s
+     Running unittests src\lib.rs (target\debug\deps\escrow-6ca0f67b36b5e168.exe)
+
+running 1 test
+test test::test_fee_router_unauthorized_route_funds - should panic ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.02s
+
+     Running unittests src\lib.rs (target\debug\deps\fee_router-00da9e787d37fe18.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\payout-1e2501716e27734b.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+============================== 
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:115:14
+    |
+115 |             .publish((symbol_short!("JOB"), symbol_short!("CREATED")), job_id);
+    |              ^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:161:22
+    |
+161 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:212:22
+    |
+212 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:258:22
+    |
+258 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:304:22
+    |
+304 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:353:22
+    |
+353 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:416:22
+    |
+416 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:468:22
+    |
+468 |         env.events().publish(
+    |                      ^^^^^^^
+
+warning: `escrow` (lib test) generated 8 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src\lib.rs (target\debug\deps\escrow-6ca0f67b36b5e168.exe)
+
+running 8 tests
+test test::test_self_dealing_rejection ... ok
+test test::test_fee_router_unauthorized_route_funds - should panic ... ok
+test test::test_unauthorized_add_milestone ... ok
+test test::test_distribute_without_router ... ok
+test test::test_unauthorized_resolve_dispute_by_client ... ok
+test test::test_unauthorized_submit_milestone ... ok
+test test::test_double_distribute_milestone ... ok
+test test::test_create_job_and_milestones ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+============================== 
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src\lib.rs (target\debug\deps\fee_router-00da9e787d37fe18.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+============================== 
+
+Name            Length
+----            ------
+escrow.wasm       9768
+fee_router.wasm   1825
+payout.wasm        583
+
+

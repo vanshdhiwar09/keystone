@@ -1,0 +1,59 @@
+ℹ️  CARGO_BUILD_RUSTFLAGS=--remap-path-prefix=C:/Users/admin/.cargo/registry/src= SOROBAN_SDK_BUILD_SYSTEM_SUPPORTS_SPEC_SHAKING_V2=1 cargo rustc --manifest-path=contracts\escrow\Cargo.toml --crate-type=cdylib --target=wasm32v1-none --release
+   Compiling escrow v0.0.0 (C:\Users\admin\Desktop\keystone\contracts\escrow)
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:107:22
+    |
+107 |         env.events().publish((symbol_short!("JOB"), symbol_short!("CREATED")), job_id);
+    |                      ^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:145:22
+    |
+145 |         env.events().publish((symbol_short!("MILESTONE"), symbol_short!("ADDED")), (job_id, milestone_id, amount));
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:181:22
+    |
+181 |         env.events().publish((symbol_short!("MILESTONE"), symbol_short!("FUNDED")), (job_id, milestone_id));
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:212:22
+    |
+212 |         env.events().publish((symbol_short!("MILESTONE"), symbol_short!("SUBMITTED")), (job_id, milestone_id));
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:243:22
+    |
+243 |         env.events().publish((symbol_short!("MILESTONE"), symbol_short!("APPROVED")), (job_id, milestone_id));
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:274:22
+    |
+274 |         env.events().publish((symbol_short!("MILESTONE"), symbol_short!("DISPUTED")), (job_id, milestone_id));
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:314:22
+    |
+314 |         env.events().publish((symbol_short!("MILESTONE"), symbol_short!("RESOLVED")), (job_id, milestone_id, release_funds));
+    |                      ^^^^^^^
+
+warning: use of deprecated method `soroban_sdk::events::Events::publish`: use the #[contractevent] macro on a contract event type
+   --> contracts\escrow\src\lib.rs:347:22
+    |
+347 |         env.events().publish((symbol_short!("MILESTONE"), symbol_short!("RELEASED")), (job_id, milestone_id));
+    |                      ^^^^^^^
+
+warning: Linking globals named 'initialize': symbol multiply defined!
+
+error: failed to load bitcode of module "fee_router.fee_router.35f3541730bc21ab-cgu.0.rcgu.o": 
+
+warning: `escrow` (lib) generated 9 warnings
+error: could not compile `escrow` (lib) due to 1 previous error; 9 warnings emitted
+❌ error: exit status exit code: 101

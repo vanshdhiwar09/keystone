@@ -1,24 +1,41 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, symbol_short, token, Address, Env, Symbol};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, symbol_short, token, Address, Env, Symbol,
+};
 
 const PLATFORM_ADDR: Symbol = symbol_short!("PLATFORM");
 const ESCROW_ADDR: Symbol = symbol_short!("ESCROW");
 const DAY_IN_LEDGERS: u32 = 17280;
-const TTL_THRESHOLD: u32 = 7 * DAY_IN_LEDGERS; 
+const TTL_THRESHOLD: u32 = 7 * DAY_IN_LEDGERS;
 const TTL_EXTEND: u32 = 14 * DAY_IN_LEDGERS;
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum FeeRouterError {
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
+}
 
 #[contract]
 pub struct FeeRouterContract;
 
 #[contractimpl]
 impl FeeRouterContract {
-    pub fn initialize(env: Env, platform: Address, escrow: Address) {
+    pub fn init_fee_router(
+        env: Env,
+        platform: Address,
+        escrow: Address,
+    ) -> Result<(), FeeRouterError> {
         if env.storage().instance().has(&PLATFORM_ADDR) {
-            panic!("Contract already initialized");
+            return Err(FeeRouterError::AlreadyInitialized);
         }
         env.storage().instance().set(&PLATFORM_ADDR, &platform);
         env.storage().instance().set(&ESCROW_ADDR, &escrow);
-        env.storage().instance().extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
+        env.storage()
+            .instance()
+            .extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
+        Ok(())
     }
 
     pub fn route_funds(
@@ -26,14 +43,20 @@ impl FeeRouterContract {
         token: Address,
         freelancer: Address,
         amount: i128,
-    ) {
-        let escrow: Address = env.storage().instance().get(&ESCROW_ADDR).expect("Contract uninitialized");
-        // Cross-contract enforcement explicitly mapped requiring native soroban auth bounds gracefully executed by caller contract explicitly.
+    ) -> Result<(), FeeRouterError> {
+        let escrow: Address = env
+            .storage()
+            .instance()
+            .get(&ESCROW_ADDR)
+            .ok_or(FeeRouterError::NotInitialized)?;
         escrow.require_auth();
 
-        let platform: Address = env.storage().instance().get(&PLATFORM_ADDR).expect("Contract uninitialized");
+        let platform: Address = env
+            .storage()
+            .instance()
+            .get(&PLATFORM_ADDR)
+            .ok_or(FeeRouterError::NotInitialized)?;
 
-        // Mathematical integrity perfectly preserving logic without drift
         let platform_fee = (amount * 2) / 100;
         let freelancer_amount = amount - platform_fee;
 
@@ -47,5 +70,6 @@ impl FeeRouterContract {
         if freelancer_amount > 0 {
             token_client.transfer(&contract_address, &freelancer, &freelancer_amount);
         }
+        Ok(())
     }
 }
