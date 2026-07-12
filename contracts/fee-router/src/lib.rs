@@ -1,10 +1,12 @@
 #![no_std]
+use payout::PayoutContractClient;
 use soroban_sdk::{
     contract, contracterror, contractimpl, symbol_short, token, Address, Env, Symbol,
 };
 
 const PLATFORM_ADDR: Symbol = symbol_short!("PLATFORM");
 const ESCROW_ADDR: Symbol = symbol_short!("ESCROW");
+const PAYOUT_ADDR: Symbol = symbol_short!("PAYOUT");
 const DAY_IN_LEDGERS: u32 = 17280;
 const TTL_THRESHOLD: u32 = 7 * DAY_IN_LEDGERS;
 const TTL_EXTEND: u32 = 14 * DAY_IN_LEDGERS;
@@ -26,12 +28,14 @@ impl FeeRouterContract {
         env: Env,
         platform: Address,
         escrow: Address,
+        payout: Address,
     ) -> Result<(), FeeRouterError> {
         if env.storage().instance().has(&PLATFORM_ADDR) {
             return Err(FeeRouterError::AlreadyInitialized);
         }
         env.storage().instance().set(&PLATFORM_ADDR, &platform);
         env.storage().instance().set(&ESCROW_ADDR, &escrow);
+        env.storage().instance().set(&PAYOUT_ADDR, &payout);
         env.storage()
             .instance()
             .extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
@@ -49,12 +53,19 @@ impl FeeRouterContract {
             .instance()
             .get(&ESCROW_ADDR)
             .ok_or(FeeRouterError::NotInitialized)?;
+        
         escrow.require_auth();
 
         let platform: Address = env
             .storage()
             .instance()
             .get(&PLATFORM_ADDR)
+            .ok_or(FeeRouterError::NotInitialized)?;
+            
+        let payout: Address = env
+            .storage()
+            .instance()
+            .get(&PAYOUT_ADDR)
             .ok_or(FeeRouterError::NotInitialized)?;
 
         let platform_fee = (amount * 2) / 100;
@@ -68,8 +79,16 @@ impl FeeRouterContract {
         }
 
         if freelancer_amount > 0 {
-            token_client.transfer(&contract_address, &freelancer, &freelancer_amount);
+            // Forward capital specifically into the execution bridge natively
+            token_client.transfer(&contract_address, &payout, &freelancer_amount);
+            
+            // Bridge cross-contract triggering explicit SDK auth limits recursively ensuring bounds!
+            let payout_client = PayoutContractClient::new(&env, &payout);
+            payout_client.execute_payout(&token, &freelancer, &freelancer_amount);
         }
+        
         Ok(())
     }
 }
+ 
+mod test; 

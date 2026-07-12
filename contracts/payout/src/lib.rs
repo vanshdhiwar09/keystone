@@ -1,23 +1,60 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, vec, Env, String, Vec};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, symbol_short, token, Address, Env, Symbol,
+};
 
-#[contract]
-pub struct Contract;
+const ROUTER_ADDR: Symbol = symbol_short!("ROUTER");
+const DAY_IN_LEDGERS: u32 = 17280;
+const TTL_THRESHOLD: u32 = 7 * DAY_IN_LEDGERS;
+const TTL_EXTEND: u32 = 14 * DAY_IN_LEDGERS;
 
-// This is a sample contract. Replace this placeholder with your own contract logic.
-// A corresponding test example is available in `test.rs`.
-//
-// For comprehensive examples, visit <https://github.com/stellar/soroban-examples>.
-// The repository includes use cases for the Stellar ecosystem, such as data storage on
-// the blockchain, token swaps, liquidity pools, and more.
-//
-// Refer to the official documentation:
-// <https://developers.stellar.org/docs/build/smart-contracts/overview>.
-#[contractimpl]
-impl Contract {
-    pub fn hello(env: Env, to: String) -> Vec<String> {
-        vec![&env, String::from_str(&env, "Hello"), to]
-    }
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum PayoutError {
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
 }
 
-mod test;
+#[contract]
+pub struct PayoutContract;
+
+#[contractimpl]
+impl PayoutContract {
+    pub fn init_payout(env: Env, fee_router: Address) -> Result<(), PayoutError> {
+        if env.storage().instance().has(&ROUTER_ADDR) {
+            return Err(PayoutError::AlreadyInitialized);
+        }
+        env.storage().instance().set(&ROUTER_ADDR, &fee_router);
+        env.storage()
+            .instance()
+            .extend_ttl(TTL_THRESHOLD, TTL_EXTEND);
+        Ok(())
+    }
+
+    pub fn execute_payout(
+        env: Env,
+        token: Address,
+        freelancer: Address,
+        amount: i128,
+    ) -> Result<(), PayoutError> {
+        let router: Address = env
+            .storage()
+            .instance()
+            .get(&ROUTER_ADDR)
+            .ok_or(PayoutError::NotInitialized)?;
+        
+        // Ensure ONLY the Fee Router can legally trigger payouts dynamically.
+        router.require_auth();
+
+        let token_client = token::Client::new(&env, &token);
+        
+        if amount > 0 {
+            token_client.transfer(&env.current_contract_address(), &freelancer, &amount);
+        }
+
+        Ok(())
+    }
+}
+ 
+mod test; 
