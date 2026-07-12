@@ -23,7 +23,6 @@ export default function ConnectWallet() {
       setInstalled(extConnected);
 
       if (extConnected) {
-        // MUST be called before NetworkDetails; calling Network without Auth officially throws! 
         const { isAllowed: extAllowed } = await isAllowed();
         if (extAllowed) {
           const { network: currentNetwork } = await getNetworkDetails();
@@ -68,8 +67,8 @@ export default function ConnectWallet() {
 
   if (installed === "loading") {
     return (
-      <div className="px-3 py-1.5 bg-gray-200 text-gray-500 rounded text-[11px] font-medium animate-pulse">
-        Loading Wallet...
+      <div className="px-3 py-1.5 bg-steel border border-limestone text-iron/70 rounded text-[11px] font-medium animate-pulse">
+        Loading...
       </div>
     );
   }
@@ -78,10 +77,10 @@ export default function ConnectWallet() {
   if (installed === "error") {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-red-500 font-semibold uppercase tracking-tight">Connection Error</span>
+        <span className="text-[10px] text-oxide font-bold uppercase tracking-tight">Connection Fault</span>
         <button
           onClick={checkFreighter}
-          className="px-2 py-1 bg-red-100 shadow-sm hover:bg-red-200 text-red-700 rounded text-[10px] font-bold transition-colors uppercase tracking-tight"
+          className="px-2 py-1 bg-limestone hover:bg-limestone/80 text-iron rounded text-[10px] font-bold transition-colors uppercase tracking-tight focus:outline-2 focus:outline-offset-2 focus:outline-banknote"
         >
           Check Again
         </button>
@@ -96,19 +95,19 @@ export default function ConnectWallet() {
         href="https://www.freighter.app/"
         target="_blank"
         rel="noopener noreferrer"
-        className="px-3 py-1.5 bg-blue-600 shadow-sm hover:bg-blue-700 text-white rounded font-medium text-xs transition-colors tracking-tight whitespace-nowrap"
+        className="px-3 py-1.5 bg-banknote text-alum hover:bg-banknote/90 rounded font-medium text-xs transition-colors tracking-tight whitespace-nowrap focus:outline-2 focus:outline-offset-2 focus:outline-banknote"
       >
         Install Freighter
       </a>
     );
   }
 
-  // 3: Connected but distinctly Wrong Network (Evaluates safely because network only populates if auth passed)
+  // 3: Connected but distinctly Wrong Network 
   if (network && network !== "TESTNET") {
     return (
-      <div className="px-3 py-1.5 bg-amber-600 shadow-sm text-white rounded text-[10px] text-center flex flex-col items-center leading-tight whitespace-nowrap">
-        <span className="font-semibold uppercase tracking-wide">Wrong Network</span>
-        <span className="text-amber-200 tracking-tight">Switch to Testnet</span>
+      <div className="px-3 py-1.5 border border-oxide text-oxide bg-alum rounded text-[10px] text-center flex flex-col items-center leading-tight whitespace-nowrap">
+        <span className="font-bold uppercase tracking-wide">Network Fault</span>
+        <span className="tracking-tight">Switch to Testnet</span>
       </div>
     );
   }
@@ -118,7 +117,7 @@ export default function ConnectWallet() {
     return (
       <button
         onClick={connect}
-        className="px-3 py-1.5 bg-blue-600 shadow-sm hover:bg-blue-700 text-white rounded font-medium text-xs transition-colors tracking-tight whitespace-nowrap"
+        className="px-3 py-1.5 bg-banknote text-alum hover:bg-banknote/90 rounded font-medium text-xs transition-colors tracking-tight whitespace-nowrap focus:outline-2 focus:outline-offset-2 focus:outline-banknote"
       >
         Connect Wallet
       </button>
@@ -128,12 +127,12 @@ export default function ConnectWallet() {
   // 5: Online & Bound Correctly
   return (
     <div className="flex items-center gap-1.5">
-      <div className="px-2 py-1 bg-emerald-950 border border-emerald-800 text-emerald-400 rounded text-[10px] font-mono tracking-tight shadow-inner whitespace-nowrap">
+      <div className="px-2 py-1 bg-brass text-iron rounded text-[10px] font-mono tracking-tight font-bold shadow-inner whitespace-nowrap uppercase">
         {truncateAddress(publicKey)}
       </div>
       <button
         onClick={disconnect}
-        className="px-2 py-1 bg-gray-800 shadow-sm hover:bg-gray-700 text-gray-300 rounded text-[10px] transition-colors whitespace-nowrap tracking-tight"
+        className="px-2 py-1 bg-steel border border-limestone hover:bg-limestone text-iron rounded text-[10px] transition-colors whitespace-nowrap tracking-tight font-medium focus:outline-2 focus:outline-offset-2 focus:outline-banknote"
       >
         Disconnect
       </button>

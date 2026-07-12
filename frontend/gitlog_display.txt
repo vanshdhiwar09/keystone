@@ -1,0 +1,5 @@
+commit 67ac7bf3e7a74e8ab33be17b89e1c1b8caa79c1f
+Author: Vansh Dhiwar <vansh.dhiwar985@gmail.com>
+Date:   Sun Jul 12 19:06:16 2026 +0530
+
+    fix(frontend): strip legacy publicKey coupling
