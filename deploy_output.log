@@ -1,0 +1,131 @@
+==========================================
+ Keystone Testnet Payload Network Standup 
+==========================================
+
+[1/5] Bootstrapping Explicit Tooling Identities (Local CLI Config Only)
+ Deployer Exec Address: GC7UTDIL4FRF3D3ALUKKXM4DJ4SRTOCOPZFH43M3KFTHQX47CAHQRFYJ
+
+[2/5] Wrapping Native XLM Asset for Cross-Workspace Routing
+ℹ️  Simulating transaction…
+❌ error: transaction simulation failed: HostError: Error(Storage, ExistingValue)
+
+Event log (newest first):
+   0: [Diagnostic Event] topics:[error, Error(Storage, ExistingValue)], data:["contract already exists", Bytes(d7928b72c2703ccfeaf7eb9ff4ef4d504a55a8b979fc9b450ea2c842b4d1ce61)]
+
+ XLM Wrapper Address: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+
+[3/5] Compacting and Deploying Modular Workspaces
+ℹ️  Uploading contract WASM…
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 41e8af5d3c53ec4f569f5709bb3fff63ca8546b79855d57ffc052f26b6dd8084
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/41e8af5d3c53ec4f569f5709bb3fff63ca8546b79855d57ffc052f26b6dd8084
+ℹ️  Deploying contract using wasm hash bb1ed0fd932978f98b2d699a58ae192aa01d2019fabab720bbb9422b96fe7e3b
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 82da98a9bd100a90993c5ef4c054257d95f2a04f94534d0091543784e4e64b2d
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/82da98a9bd100a90993c5ef4c054257d95f2a04f94534d0091543784e4e64b2d
+🔗 https://lab.stellar.org/r/testnet/contract/CCD5UJQEE2K7M3CATACJ5QOUZTW6V2EX54QKNROIRD423HL6OKFX5ZHA
+✅ Deployed!
+ℹ️  Uploading contract WASM…
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 155aa8a193656f6247e389887d3536483e3b81332561921fb8486c2858a33e2e
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/155aa8a193656f6247e389887d3536483e3b81332561921fb8486c2858a33e2e
+ℹ️  Deploying contract using wasm hash c0b5a860244e88ff3fa4de0269e86abcb603b0cca06a8e649123a4987cabfb57
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 7dc6a2a68998159c9813cfb7c98bbb4e4369ccd7864e9d1933daeb3b9674ab25
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/7dc6a2a68998159c9813cfb7c98bbb4e4369ccd7864e9d1933daeb3b9674ab25
+🔗 https://lab.stellar.org/r/testnet/contract/CBYVRXSCGOIMIN746C77BYEV2QKNVP6RA4JC5TTHED4JX7C6SQQ6SZ47
+✅ Deployed!
+ℹ️  Uploading contract WASM…
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 2bf48bb90a78f4d0b38f56b51d7faa71741b6b87dce65652f82b82dd7f8cbee4
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/2bf48bb90a78f4d0b38f56b51d7faa71741b6b87dce65652f82b82dd7f8cbee4
+ℹ️  Deploying contract using wasm hash e84fb7f05d29404f49d0764f868f33445ec80b0b6bfd116f6b171abecedb3628
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 644212cb4356428af451b5b3fe0898895a54aee64793d6f5adb483d87a1bf83d
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/644212cb4356428af451b5b3fe0898895a54aee64793d6f5adb483d87a1bf83d
+🔗 https://lab.stellar.org/r/testnet/contract/CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC
+✅ Deployed!
+ PAYOUT:  CCD5UJQEE2K7M3CATACJ5QOUZTW6V2EX54QKNROIRD423HL6OKFX5ZHA
+ ROUTER:  CBYVRXSCGOIMIN746C77BYEV2QKNVP6RA4JC5TTHED4JX7C6SQQ6SZ47
+ ESCROW:  CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC
+
+[4/5] Initializing Nested Dependencies
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: b2f55e8345bb264598b7f495ce53e8f0c360f286b71abb0255270d17743ef88d
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/b2f55e8345bb264598b7f495ce53e8f0c360f286b71abb0255270d17743ef88d
+null
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 2702903f54db06fbd1aa2a4ed14d526f2e1989ef586d91193a1a341c95b9339a
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/2702903f54db06fbd1aa2a4ed14d526f2e1989ef586d91193a1a341c95b9339a
+null
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 8511beea7c148bd9e3754a5dbcbdbe437c71931d908a49cf5329f183bb5f48ef
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/8511beea7c148bd9e3754a5dbcbdbe437c71931d908a49cf5329f183bb5f48ef
+null
+ Dependencies Dynamically Locked!
+
+[5/5] Executing E2E Physical Deployment Verification (1000 Stroops)
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: cb11702dd90fbe96e7d9eab9bdd3437c0524907eb8bacab55a8855403ff0b7f8
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/cb11702dd90fbe96e7d9eab9bdd3437c0524907eb8bacab55a8855403ff0b7f8
+📅 CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC - Success - Event: [{"symbol":"JOB"},{"symbol":"CREATED"}] = {"u32":1}
+ Job Successfully Defined. ID=1
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: e103676d8cdaf679ff9f67e8a08f8217c8c4496891b6b0e0fbfd842e328d43c8
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/e103676d8cdaf679ff9f67e8a08f8217c8c4496891b6b0e0fbfd842e328d43c8
+📅 CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC - Success - Event: [{"symbol":"MILESTONE"},{"symbol":"ADDED"}] = {"vec":[{"u32":1},{"u32":1},{"i128":"1000"}]}
+ Milestone Successfully Generated. ID=1
+ > Funding Escrow Node...
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 2b9f3f203c4beba6fd245c0dd346d08b54ee0d861753a77b0f0d1b604c3c1b62
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/2b9f3f203c4beba6fd245c0dd346d08b54ee0d861753a77b0f0d1b604c3c1b62
+📅 CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC - Success - Event: [{"symbol":"transfer"},{"address":"GDWV5JH35VG5YEIM77FYYBQXXYS5GNCPINHZTRC4VHUOGTLWVSUOKBXR"},{"address":"CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC"},{"string":"native"}] = {"i128":"1000"}
+📅 CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC - Success - Event: [{"symbol":"MILESTONE"},{"symbol":"FUNDED"}] = {"vec":[{"u32":1},{"u32":1}]}
+ > Freelancer Output Trigger...
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: 14dc9ba80f5a9e5fd7e5ae2be4d3c41c668187045f343c8ae7a929d642e16d28
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/14dc9ba80f5a9e5fd7e5ae2be4d3c41c668187045f343c8ae7a929d642e16d28
+📅 CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC - Success - Event: [{"symbol":"MILESTONE"},{"symbol":"SUBMITTED"}] = {"vec":[{"u32":1},{"u32":1}]}
+ > Client Approval Routing...
+ℹ️  Simulating transaction…
+ℹ️  Signing transaction: b01c6d3ee11df4242d0d9428cbcb4bc0afb66ec05bff55faad637924ca623c34
+🌎 Sending transaction…
+✅ Transaction submitted successfully!
+🔗 https://stellar.expert/explorer/testnet/tx/b01c6d3ee11df4242d0d9428cbcb4bc0afb66ec05bff55faad637924ca623c34
+📅 CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC - Success - Event: [{"symbol":"MILESTONE"},{"symbol":"APPROVED"}] = {"vec":[{"u32":1},{"u32":1}]}
+
+==========================================
+ DISTRIBUTING PHYSICAL NETWORK CAPITAL
+==========================================
+Full CLI output (stdout + stderr):
+ℹ️  Simulating transaction… ℹ️  Signing transaction: 756f329eac01ae2dde71936b1577365cf3cd595552356b8d4378938eb677cc8e 🌎 Sending transaction… ✅ Transaction submitted successfully! 🔗 https://stellar.expert/explorer/testnet/tx/756f329eac01ae2dde71936b1577365cf3cd595552356b8d4378938eb677cc8e 📅 CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC - Success - Event: [{"symbol":"transfer"},{"address":"CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC"},{"address":"CBYVRXSCGOIMIN746C77BYEV2QKNVP6RA4JC5TTHED4JX7C6SQQ6SZ47"},{"string":"native"}] = {"i128":"1000"} 📅 CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC - Success - Event: [{"symbol":"transfer"},{"address":"CBYVRXSCGOIMIN746C77BYEV2QKNVP6RA4JC5TTHED4JX7C6SQQ6SZ47"},{"address":"GAFQSWSUWTMBRXLCJVU3FWBHTENSKKFXDDOX3OF4Q7XAGICTN3RBKOUB"},{"string":"native"}] = {"i128":"20"} 📅 CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC - Success - Event: [{"symbol":"transfer"},{"address":"CBYVRXSCGOIMIN746C77BYEV2QKNVP6RA4JC5TTHED4JX7C6SQQ6SZ47"},{"address":"CCD5UJQEE2K7M3CATACJ5QOUZTW6V2EX54QKNROIRD423HL6OKFX5ZHA"},{"string":"native"}] = {"i128":"980"} 📅 CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC - Success - Event: [{"symbol":"transfer"},{"address":"CCD5UJQEE2K7M3CATACJ5QOUZTW6V2EX54QKNROIRD423HL6OKFX5ZHA"},{"address":"GCSBJOJCRAOH24HQJBE7BLWUO3GMHWED3E5X2ENDL4WSI3OKYRGPIGMK"},{"string":"native"}] = {"i128":"980"} 📅 CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC - Success - Event: [{"symbol":"MILESTONE"},{"symbol":"RELEASED"}] = {"vec":[{"u32":1},{"u32":1}]} null
+
+WARNING: No line containing 'hash' found in CLI output.
+Fallback: look up this contract's recent transactions on Stellar Expert:
+https://stellar.expert/explorer/testnet/contract/CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC
