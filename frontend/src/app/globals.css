@@ -1,26 +1,29 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-steel: #F6F7F9;
+  --color-alum: #FFFFFF;
+  --color-iron: #161A1D;
+  --color-banknote: #1D4F44;
+  --color-brass: #BFA15F;
+  --color-limestone: #D9DFE3;
+
+  --font-display: "Bricolage Grotesque", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+
+  --font-sans: var(--font-body);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: var(--color-steel);
+  --foreground: var(--color-iron);
 }
+
+/* Remove darkmode overrides explicitly maintaining high-trust Daylight physical mapping */
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  @apply antialiased text-iron bg-steel;
 }
