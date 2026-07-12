@@ -104,7 +104,7 @@ export default function ConnectWallet() {
   }
 
   // 3: Connected but distinctly Wrong Network (Evaluates safely because network only populates if auth passed)
-  if (publicKey && network !== "TESTNET") {
+  if (network && network !== "TESTNET") {
     return (
       <div className="px-3 py-1.5 bg-amber-600 shadow-sm text-white rounded text-[10px] text-center flex flex-col items-center leading-tight whitespace-nowrap">
         <span className="font-semibold uppercase tracking-wide">Wrong Network</span>
