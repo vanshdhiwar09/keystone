@@ -8,8 +8,8 @@ export default function Home() {
         <ConnectWallet />
       </header>
 
-      <main className="flex-1 p-6 flex flex-col items-center justify-center bg-steel max-w-[375px] mx-auto w-full border-x border-limestone shadow-[0_0_20px_rgba(0,0,0,0.03)]">
-        <p className="text-iron/40 text-sm text-center">
+      <main className="flex-1 p-6 flex flex-col bg-alum max-w-4xl mx-auto w-full border-x border-limestone shadow-[0_0_20px_rgba(0,0,0,0.03)] selection:bg-banknote selection:text-alum">
+        <p className="text-iron/40 text-sm text-center my-auto">
           Ledger content boundary
         </p>
       </main>
