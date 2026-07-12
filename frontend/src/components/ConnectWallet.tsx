@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import {
   isConnected,
   isAllowed,
-  setAllowed,
-  getNetwork,
-  getUserInfo,
+  requestAccess,
+  getAddress,
+  getNetworkDetails,
 } from "@stellar/freighter-api";
 
 export default function ConnectWallet() {
@@ -17,18 +17,20 @@ export default function ConnectWallet() {
   useEffect(() => {
     const checkFreighter = async () => {
       try {
-        const isExtConnected = await isConnected();
-        setInstalled(isExtConnected);
+        // v6.0 Returns object payload { isConnected: boolean }
+        const { isConnected: extConnected } = await isConnected();
+        setInstalled(extConnected);
 
-        if (isExtConnected) {
-          const networkData = await getNetwork();
-          setNetwork(networkData);
+        if (extConnected) {
+          const { network: currentNetwork } = await getNetworkDetails();
+          setNetwork(currentNetwork);
 
-          const hasAllowed = await isAllowed();
-          if (hasAllowed) {
-            const userInfo = await getUserInfo();
-            if (userInfo.publicKey) {
-              setPublicKey(userInfo.publicKey);
+          const { isAllowed: extAllowed } = await isAllowed();
+          if (extAllowed) {
+            // v6.0 replaces `getUserInfo` securely extracting `{ address: string }`
+            const { address } = await getAddress();
+            if (address) {
+              setPublicKey(address);
             }
           }
         }
@@ -41,13 +43,13 @@ export default function ConnectWallet() {
 
   const connect = async () => {
     try {
-      await setAllowed();
-      const userInfo = await getUserInfo();
-      if (userInfo.publicKey) {
-        setPublicKey(userInfo.publicKey);
+      // v6.0 officially defines `requestAccess()` substituting generic `setAllowed()` returns payload directly!
+      const { address } = await requestAccess();
+      if (address) {
+        setPublicKey(address);
       }
-      const networkData = await getNetwork();
-      setNetwork(networkData);
+      const { network: currentNetwork } = await getNetworkDetails();
+      setNetwork(currentNetwork);
     } catch (e) {
       console.error("Failed to connect Freighter Extension:", e);
     }
