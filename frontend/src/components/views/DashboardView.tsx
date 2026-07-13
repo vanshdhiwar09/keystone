@@ -67,11 +67,7 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                 </div>
 
                 <div className="arch-theater stagger-3" id="hero-arch">
-                    {/* Static rendering. In production this could house ThreeJS or SVG dynamic draw tracking. */}
-                    <svg className="dynamic-arch" viewBox="0 0 100 100" fill="none">
-                        <path d="M 20 100 L 20 40 C 20 10 80 10 80 40 L 80 100" stroke="var(--brass)" strokeWidth="6" strokeLinecap="square" />
-                        <path d="M 40 100 L 40 45 C 40 30 60 30 60 45 L 60 100" stroke="var(--iron)" strokeWidth="2" />
-                    </svg>
+                    <HeroArch />
                 </div>
             </div>
 

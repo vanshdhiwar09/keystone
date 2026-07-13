@@ -215,9 +215,11 @@
   }
   /* The signature animated fill for "Trust" */
   .hero-statement h2 em::before {
-    content: 'Trust'; position: absolute; left: 0; top: 0; bottom: 0; width: 0; overflow: hidden;
-    color: var(--banknote); -webkit-text-stroke: 0; 
-    animation: fillText 2s var(--ease-heavy) 1s forwards;
+    content: 'Trust'; position: absolute; left: 0; top: 0; bottom: 0; width: 100%; overflow: visible;
+    color: var(--banknote); -webkit-text-stroke: 0;
+    border-right: 4px solid var(--brass);
+    padding-right: 8px;
+    animation: none;
     white-space: nowrap;
   }
   @keyframes fillText { to { width: 100%; } }
@@ -423,7 +425,7 @@
     padding: 24px 32px; box-shadow: 0 12px 24px rgba(17,19,21,0.02);
     font-size: 18px; font-weight: 500; line-height: 1.5;
   }
-  .f-content strong { color: var(--iron); font-weight: 800;  }
+  .f-content strong { color: var(--iron) !important; font-weight: 800 !important; background: transparent !important; }
 
   /* Respect reduced-motion preference — disable non-essential animation */
   @media (prefers-reduced-motion: reduce) {
