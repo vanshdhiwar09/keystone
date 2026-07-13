@@ -28,7 +28,7 @@ export default function NavigationDock({ activeView, setActiveView }: DockProps)
 
     const tabs = [
         { id: "dashboard", label: "Dashboard" },
-        { id: "blueprint", label: "Blueprint" },
+        { id: "blueprint", label: "Ledger" },
         { id: "vault", label: "Vault" },
         { id: "tx", label: "Terminal" },
         { id: "feed", label: "Activity" }
