@@ -1,3 +1,61 @@
+import { useEffect, useState } from "react";
+
+function HeroArch() {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setTimeout(() => setMounted(true), 50);
+    }, []);
+
+    const stones = 9;
+    const paths = Array.from({ length: stones }).map((_, i) => {
+        const cx = 200, cy = 250, r1 = 100, r2 = 160;
+        const startAngle = 180, endAngle = 0;
+        const a0 = startAngle - (i / stones) * (startAngle - endAngle);
+        const a1 = startAngle - ((i + 1) / stones) * (startAngle - endAngle);
+        const rad0 = (a0 * Math.PI) / 180, rad1 = (a1 * Math.PI) / 180;
+
+        const x1 = cx + r1 * Math.cos(rad0), y1 = cy - r1 * Math.sin(rad0);
+        const x2 = cx + r2 * Math.cos(rad0), y2 = cy - r2 * Math.sin(rad0);
+        const x3 = cx + r2 * Math.cos(rad1), y3 = cy - r2 * Math.sin(rad1);
+        const x4 = cx + r1 * Math.cos(rad1), y4 = cy - r1 * Math.sin(rad1);
+        const isKeystone = i === Math.floor(stones / 2);
+
+        const d = `M${x1},${y1} L${x2},${y2} L${x3},${y3} L${x4},${y4} Z`;
+        const delay = isKeystone ? 1000 : (i < 4 ? i * 150 : (8 - i) * 150);
+
+        const style = mounted ? {
+            opacity: 1,
+            transform: 'translateY(0)',
+            stroke: isKeystone ? 'var(--brass)' : 'var(--iron)',
+            fill: isKeystone ? 'var(--brass)' : 'var(--alum)',
+            filter: isKeystone ? 'drop-shadow(0 0 24px rgba(191,161,95,0.8))' : 'none',
+            strokeWidth: '1.5px',
+            strokeDasharray: 400,
+            strokeDashoffset: 0,
+            transition: `all 0.8s cubic-bezier(0.85, 0, 0.15, 1) ${delay}ms`
+        } : {
+            opacity: isKeystone ? 0 : 1,
+            transform: isKeystone ? 'translateY(-40px)' : 'translateY(0)',
+            fill: 'transparent',
+            stroke: 'var(--iron)',
+            strokeWidth: '1.5px',
+            strokeDasharray: 400,
+            strokeDashoffset: 400,
+            filter: 'none',
+            transition: `all 0.8s cubic-bezier(0.85, 0, 0.15, 1)`
+        };
+
+        return <path key={i} d={d} style={style} />;
+    });
+
+    return (
+        <svg className="dynamic-arch" viewBox="0 0 400 300" fill="none">
+            <path d="M20,250 L380,250" stroke="var(--grid-major)" strokeWidth="2" />
+            {paths}
+        </svg>
+    );
+}
+
 export default function DashboardView({ setView }: { setView: (v: string) => void }) {
     return (
         <main className="view active-view" id="view-dashboard">
