@@ -1,65 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  isConnected,
-  isAllowed,
-  requestAccess,
-  getAddress,
-  getNetworkDetails,
-} from "@stellar/freighter-api";
-
-type InstallState = "loading" | "error" | true | false;
+import { useWallet } from "../context/WalletContext";
 
 export default function ConnectWallet() {
-  const [installed, setInstalled] = useState<InstallState>("loading");
-  const [network, setNetwork] = useState<string | null>(null);
-  const [publicKey, setPublicKey] = useState<string | null>(null);
-
-  const checkFreighter = async () => {
-    setInstalled("loading");
-    try {
-      const { isConnected: extConnected } = await isConnected();
-      setInstalled(extConnected);
-
-      if (extConnected) {
-        const { isAllowed: extAllowed } = await isAllowed();
-        if (extAllowed) {
-          const { network: currentNetwork } = await getNetworkDetails();
-          setNetwork(currentNetwork);
-
-          const { address } = await getAddress();
-          if (address) {
-            setPublicKey(address);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error accessing Freighter API:", error);
-      setInstalled("error");
-    }
-  };
-
-  useEffect(() => {
-    checkFreighter();
-  }, []);
-
-  const connect = async () => {
-    try {
-      const { address } = await requestAccess();
-      if (address) {
-        setPublicKey(address);
-      }
-      const { network: currentNetwork } = await getNetworkDetails();
-      setNetwork(currentNetwork);
-    } catch (e) {
-      console.error("Failed to connect Freighter Extension:", e);
-    }
-  };
-
-  const disconnect = () => {
-    setPublicKey(null);
-  };
+  const { installed, network, publicKey, checkFreighter, connect, disconnect } = useWallet();
 
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 4)}...${address.slice(-4)}`;

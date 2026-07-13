@@ -1,33 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getAddress } from "@stellar/freighter-api";
+import { useState } from "react";
 import { StrKey } from "@stellar/stellar-sdk";
+import { useWallet } from "../context/WalletContext";
 
 export default function CreateJobFlow() {
-    const [clientKey, setClientKey] = useState<string | null>(null);
+    const { publicKey } = useWallet(); // Inherit explicitly from the centralized Layout source
     const [step, setStep] = useState(1);
     const [freelancer, setFreelancer] = useState("");
     const [amount, setAmount] = useState("");
 
-    // Poll Freighter to securely tie this component's active permissions to the global extension status
-    useEffect(() => {
-        const lockWalletState = async () => {
-            try {
-                const { address } = await getAddress();
-                setClientKey(address || null);
-            } catch {
-                setClientKey(null);
-            }
-        };
-
-        lockWalletState();
-        const interval = setInterval(lockWalletState, 1500);
-        return () => clearInterval(interval);
-    }, []);
-
     const handleCreate = async () => {
-        if (!clientKey) return;
+        if (!publicKey) return;
 
         // Stroops Conversion Plan:
         // JS `parseFloat(amount) * 1e7` causes infamous float tracking bugs (e.g. 0.58 * 1e7 = 5799999.999). 
@@ -39,7 +23,7 @@ export default function CreateJobFlow() {
         const amountInStroops = BigInt(whole + fraction).toString();
 
         console.log("Broadcasting Contract to Soroban...", {
-            clientKey,
+            clientKey: publicKey,
             freelancer,
             humanAmount: amount,
             stroops: amountInStroops
@@ -47,7 +31,7 @@ export default function CreateJobFlow() {
     };
 
     // Explicit Gate: Do not expose structural input mutations unless cryptographically bonded
-    if (!clientKey) {
+    if (!publicKey) {
         return (
             <div className="flex flex-col w-full max-w-[90%] sm:max-w-lg mx-auto py-8">
                 <div className="p-10 border border-limestone bg-steel relative shadow-inner text-center flex flex-col items-center justify-center">

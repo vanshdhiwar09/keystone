@@ -9,10 +9,10 @@
   --color-oxide: #A44C27;
   --color-limestone: #D9DFE3;
 
-  --font-display: var(--font-display), sans-serif;
-  --font-body: var(--font-body), sans-serif;
+  --font-display: var(--font-bricolage), sans-serif;
+  --font-body: var(--font-dmsans), sans-serif;
 
-  --font-sans: var(--font-body), sans-serif;
+  --font-sans: var(--font-dmsans), sans-serif;
 }
 
 :root {
