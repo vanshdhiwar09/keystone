@@ -1,30 +1,465 @@
 @import "tailwindcss";
 
-@theme inline {
-  --color-steel: #F6F7F9;
-  --color-alum: #FFFFFF;
-  --color-iron: #161A1D;
-  --color-banknote: #1D4F44;
-  --color-brass: #BFA15F;
-  --color-oxide: #A44C27;
-  --color-limestone: #D9DFE3;
+  :root {
+    /* Brand Foundation */
+    --steel: #F4F5F7;
+    --alum: #FFFFFF;
+    --iron: #111315;
+    --banknote: #184239;
+    --brass: #BFA15F;
+    --brass-light: #E6D29A;
+    --brass-glow: rgba(191, 161, 95, 0.4);
+    --oxide: #A44C27;
+    
+    /* Structural Elements */
+    --blueprint-blue: rgba(24, 66, 57, 0.03);
+    --grid-major: rgba(17, 19, 21, 0.06);
+    --grid-minor: rgba(17, 19, 21, 0.02);
+    --glass: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(17, 19, 21, 0.08);
+    --glass-shadow: 0 24px 48px rgba(17, 19, 21, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+    
+    /* Physics & Easing (Apple/Linear tier) */
+    --ease-heavy: cubic-bezier(0.85, 0, 0.15, 1);
+    --ease-snappy: cubic-bezier(0.2, 0.8, 0.1, 1.1);
+    --ease-fluid: cubic-bezier(0.16, 1, 0.3, 1);
+    
+    /* Depth Z-Index */
+    --z-bg: 0; --z-grid: 10; --z-lights: 20; --z-content: 30; --z-overlay: 100; --z-dock: 200; --z-preloader: 1000;
+  }
 
-  --font-display: var(--font-bricolage), sans-serif;
-  --font-body: var(--font-dmsans), sans-serif;
+  /* Global Reset & Typography */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  html, body {
+    background-color: var(--steel);
+    color: var(--iron);
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+    min-height: 100vh;
+    scroll-behavior: smooth;
+  }
 
-  --font-sans: var(--font-dmsans), sans-serif;
-}
+  ::selection { background: var(--brass); color: var(--iron); }
 
-:root {
-  --background: var(--color-steel);
-  --foreground: var(--color-iron);
-}
+  .display { font-family: 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.04em; font-feature-settings: "ss01" on, "cv01" on; }
+  .mono { font-family: 'DM Mono', ui-monospace, monospace; letter-spacing: -0.01em; }
+  .cad-label { font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(17,19,21,0.4); }
 
-/* Remove darkmode overrides explicitly maintaining high-trust Daylight physical mapping */
+  /* Environmental Architecture */
+  .environment {
+    position: fixed; inset: 0; z-index: var(--z-bg); pointer-events: none;
+    background: radial-gradient(circle at 50% 0%, var(--alum) 0%, var(--steel) 100%);
+  }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-body);
-  @apply antialiased text-iron bg-steel;
-}
+  .blueprint-grid {
+    position: absolute; inset: 0; z-index: var(--z-grid);
+    background-image: 
+      linear-gradient(var(--grid-major) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+      linear-gradient(var(--grid-minor) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+    background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+    background-position: center top;
+    mask-image: radial-gradient(ellipse at 50% 20%, black 20%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse at 50% 20%, black 20%, transparent 80%);
+  }
+
+  .tactile-noise {
+    position: absolute; inset: 0; z-index: 15; opacity: 0.04; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  .ambient-light {
+    position: absolute; top: -10vw; left: 50%; transform: translateX(-50%);
+    width: 60vw; height: 30vw; background: radial-gradient(ellipse, var(--brass-glow) 0%, transparent 70%);
+    filter: blur(80px); z-index: var(--z-lights); opacity: 0.5;
+  }
+
+  /* Main Layout */
+  .app-frame {
+    position: relative; z-index: var(--z-content);
+    max-width: 1400px; margin: 0 auto; padding: 40px 60px 200px;
+  }
+
+  /* Header / Top Bar */
+  .global-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 60px; border-bottom: 1px solid var(--grid-major);
+    margin-bottom: 60px;
+  }
+
+  .brand-lockup { display: flex; align-items: center; gap: 16px; }
+  .brand-logo-svg { width: 36px; height: 36px; overflow: visible; }
+  .brand-lockup h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.04em; color: var(--iron); }
+
+  .wallet-pill {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.8); backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border); border-radius: 32px;
+    padding: 8px 16px 8px 10px; box-shadow: 0 4px 12px rgba(17,19,21,0.03);
+    cursor: pointer; transition: all 0.3s var(--ease-fluid);
+  }
+  .wallet-pill:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(17,19,21,0.06); }
+  .status-dot { width: 8px; height: 8px; background: var(--banknote); border-radius: 50%; box-shadow: 0 0 12px var(--banknote); }
+  .wallet-address { font-size: 13px; font-weight: 600; color: var(--iron); }
+  .network-badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(17,19,21,0.5); border-left: 1px solid var(--glass-border); padding-left: 12px; }
+
+  /* Buttons */
+  .btn-arch {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    padding: 16px 32px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em; border: none; cursor: pointer;
+    overflow: hidden; transition: all 0.4s var(--ease-snappy);
+    background: var(--iron); color: var(--brass-light);
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  }
+  .btn-arch::before {
+    content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+  }
+  .btn-arch:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(17,19,21,0.2); background: #000; }
+  .btn-arch:active { transform: translateY(0); }
+  
+  .btn-outline {
+    background: transparent; color: var(--iron); border: 1px solid var(--iron);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  }
+  .btn-outline:hover { background: var(--iron); color: var(--alum); }
+  .btn-danger { color: var(--oxide); border-color: var(--oxide); }
+  .btn-danger:hover { background: var(--oxide); color: var(--alum); }
+
+  /* The Glass Dock */
+  .nav-dock-wrapper {
+    position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+    z-index: var(--z-dock); perspective: 1000px;
+  }
+  .nav-dock {
+    display: flex; gap: 4px; padding: 6px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(40px) saturate(150%); -webkit-backdrop-filter: blur(40px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 40px; box-shadow: var(--glass-shadow), 0 0 0 1px rgba(17,19,21,0.02);
+    position: relative;
+  }
+  .dock-item {
+    position: relative; z-index: 2; padding: 14px 28px; border: none; background: none;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    color: rgba(17, 19, 21, 0.5); cursor: pointer; border-radius: 32px;
+    transition: color 0.3s var(--ease-fluid);
+  }
+  .dock-item:hover { color: var(--iron); }
+  .dock-item.active { color: var(--iron); }
+  
+  /* The sliding physical pill indicator */
+  .dock-indicator {
+    position: absolute; top: 6px; bottom: 6px; left: 6px; width: var(--indicator-width, 100px);
+    background: var(--alum); border-radius: 32px; z-index: 1; pointer-events: none;
+    box-shadow: 0 4px 12px rgba(17,19,21,0.08), 0 1px 2px rgba(17,19,21,0.04), inset 0 1px 0 rgba(255,255,255,1);
+    transform: translateX(var(--indicator-x, 0));
+    transition: transform 0.6s var(--ease-snappy), width 0.6s var(--ease-snappy);
+  }
+  /* Tiny brass keystone detail on the indicator */
+  .dock-indicator::after {
+    content: ''; position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; background: var(--brass); border-radius: 50%;
+    box-shadow: 0 0 8px var(--brass);
+  }
+
+  /* Views */
+  .view { 
+    display: none; opacity: 0; transform: translateY(20px); 
+    position: absolute; width: 100%; top: 0; left: 0;
+  }
+  .view.active-view { 
+    display: block; position: relative;
+    animation: architectReveal 1.2s var(--ease-heavy) forwards; 
+  }
+  
+  @keyframes architectReveal {
+    0% { opacity: 0; transform: translateY(40px) scale(0.98); filter: blur(12px); }
+    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  }
+
+  /* Staggered Content Animation Classes */
+  .stagger-1 { opacity: 0; animation: fadeUp 0.8s var(--ease-heavy) 0.1s forwards; }
+  .stagger-2 { opacity: 0; animation: fadeUp 0.8s var(--ease-heavy) 0.2s forwards; }
+  .stagger-3 { opacity: 0; animation: fadeUp 0.8s var(--ease-heavy) 0.3s forwards; }
+  .stagger-4 { opacity: 0; animation: fadeUp 0.8s var(--ease-heavy) 0.4s forwards; }
+
+  @keyframes fadeUp {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  /* View 1: Dashboard */
+  .hero-grid-layout {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: stretch;
+    margin-bottom: 80px;
+  }
+
+  .hero-statement {
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .hero-statement h2 {
+    font-size: clamp(3.5rem, 6vw, 7rem); line-height: 0.9; font-weight: 800; color: var(--iron);
+    margin-bottom: 24px;
+  }
+  .hero-statement h2 em { 
+    color: transparent; font-style: normal; position: relative;
+    -webkit-text-stroke: 1.5px var(--iron);
+    display: inline-block;
+    white-space: nowrap;
+  }
+  /* The signature animated fill for "Trust" */
+  .hero-statement h2 em::before {
+    content: 'Trust'; position: absolute; left: 0; top: 0; bottom: 0; width: 0; overflow: hidden;
+    color: var(--banknote); -webkit-text-stroke: 0; border-right: 4px solid var(--brass);
+    animation: fillText 2s var(--ease-heavy) 1s forwards;
+    white-space: nowrap;
+  }
+  @keyframes fillText { to { width: 100%; } }
+  
+  .hero-sub { font-size: 18px; line-height: 1.6; color: rgba(17,19,21,0.6); max-width: 480px; font-weight: 500; }
+
+  /* The Signature Arch Visualization */
+  .arch-theater {
+    position: relative; width: 100%; aspect-ratio: 1; 
+    background: var(--alum); border: 1px solid var(--grid-major);
+    border-radius: 4px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--glass-shadow);
+  }
+  /* CAD Measurement Lines around Arch */
+  .arch-theater::before { content:'H: 100%'; position:absolute; left: 16px; top: 50%; transform:translateY(-50%) rotate(-90deg); font-family:'DM Mono', monospace; font-size:10px; color:rgba(17,19,21,0.3); }
+  .arch-theater::after { content:'W: 100%'; position:absolute; bottom: 16px; left: 50%; transform:translateX(-50%); font-family:'DM Mono', monospace; font-size:10px; color:rgba(17,19,21,0.3); }
+  
+  .dynamic-arch { width: 80%; height: 80%; overflow: visible; filter: drop-shadow(0 32px 64px rgba(191,161,95,0.2)); }
+
+  /* Structural Data (Stats) */
+  .data-girder {
+    display: flex; border-top: 2px solid var(--iron); border-bottom: 2px solid var(--iron);
+    margin-bottom: 80px;
+  }
+  .data-block {
+    flex: 1; padding: 32px 0; border-right: 1px solid var(--grid-major);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .data-block:last-child { border-right: none; }
+  .data-value { font-size: 48px; font-weight: 600; color: var(--iron); line-height: 1; letter-spacing: -0.04em;}
+  
+  /* Modular Contract Grid */
+  .cad-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid var(--grid-major); }
+  .cad-title { font-size: 24px; font-weight: 700; color: var(--iron); letter-spacing: -0.02em; }
+  
+  .contract-module {
+    display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 32px;
+    background: var(--alum); padding: 24px 32px; margin-bottom: 16px;
+    border: 1px solid var(--glass-border); box-shadow: 0 4px 12px rgba(17,19,21,0.02);
+    cursor: pointer; transition: all 0.4s var(--ease-fluid);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .contract-module:hover {
+    transform: translateX(8px); border-color: var(--brass-light);
+    box-shadow: 0 12px 32px rgba(191,161,95,0.1);
+  }
+  .c-id { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 600; color: var(--brass); background: rgba(191,161,95,0.1); padding: 8px 12px; border-radius: 4px;}
+  .c-name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .c-parties { font-family: 'DM Mono', monospace; font-size: 12px; color: rgba(17,19,21,0.5); }
+  
+  .status-indicator { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+  .dot-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--banknote); animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(24,66,57,0.4); } 100% { box-shadow: 0 0 0 12px rgba(24,66,57,0); } }
+  
+  .c-amount { font-family: 'DM Mono', monospace; font-size: 24px; font-weight: 500; text-align: right; }
+
+  /* View 2: Blueprint */
+  .blueprint-sheet {
+    background: var(--alum); border: 1px solid var(--grid-major);
+    padding: 60px; box-shadow: var(--glass-shadow); position: relative;
+    /* Blueprint fold marks */
+    background-image: linear-gradient(var(--grid-minor) 1px, transparent 1px), linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .blueprint-sheet::before { content:''; position:absolute; top:20px; left:20px; width:20px; height:20px; border-top:2px solid var(--iron); border-left:2px solid var(--iron); }
+  .blueprint-sheet::after { content:''; position:absolute; bottom:20px; right:20px; width:20px; height:20px; border-bottom:2px solid var(--iron); border-right:2px solid var(--iron); }
+
+  .bp-header { display: grid; grid-template-columns: 1fr auto; gap: 40px; margin-bottom: 60px; border-bottom: 2px solid var(--iron); padding-bottom: 40px; }
+  .bp-title { font-size: 56px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; margin-bottom: 24px; }
+  
+  .escrow-lock { text-align: right; background: var(--iron); color: var(--alum); padding: 32px; clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%, 0 16px); }
+  .escrow-val { font-size: 48px; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--brass); line-height: 1; margin-bottom: 8px;}
+
+  /* Physical Stacking Milestones */
+  .structural-stack { display: flex; flex-direction: column; gap: 8px; margin-bottom: 60px; align-items: center;}
+  
+  .stone-module {
+    width: 100%; max-width: 800px; display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center;
+    background: var(--steel); padding: 24px 40px; 
+    transition: all 0.4s var(--ease-fluid); position: relative;
+    /* Keystone interlocking shape */
+    clip-path: polygon(2% 0, 98% 0, 100% 100%, 0 100%);
+  }
+  .stone-module:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 24px 48px rgba(17,19,21,0.1); }
+  
+  .stone-step { font-family: 'Bricolage Grotesque', sans-serif; font-size: 40px; font-weight: 800; color: rgba(17,19,21,0.1); line-height: 0.8; }
+  .stone-content h3 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  .stone-content p { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 600; text-transform: uppercase; color: rgba(17,19,21,0.5); }
+  .stone-price { font-family: 'DM Mono', monospace; font-size: 24px; font-weight: 500; }
+  
+  /* State: Approved (Brass/Gold) */
+  .stone-approved { background: linear-gradient(180deg, var(--brass-light) 0%, var(--brass) 100%); color: var(--iron); clip-path: polygon(0 0, 100% 0, 98% 100%, 2% 100%); }
+  .stone-approved .stone-step { color: rgba(255,255,255,0.4); }
+  .stone-approved .stone-content p { color: var(--iron); opacity: 0.7; }
+  
+  /* State: Disputed (Cracked/Oxide) */
+  .stone-disputed { background: var(--iron); color: var(--alum); }
+  .stone-disputed .stone-step { color: var(--oxide); }
+  .stone-disputed .stone-content p { color: var(--oxide); }
+  /* Simulated crack using SVG background */
+  .stone-disputed::after {
+    content:''; position:absolute; top:0; bottom:0; left:50%; width:40px; transform:translateX(-50%);
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10,0 L15,20 L5,40 L12,60 L8,80 L10,100' stroke='%23A44C27' fill='none' stroke-width='2'/%3E%3C/svg%3E");
+    background-size: 100% 100%; pointer-events:none; opacity: 0.5;
+  }
+
+  .action-bar { display: flex; justify-content: center; gap: 24px; }
+
+  /* View 3: Vault */
+  .vault-chamber {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 70vh; position: relative;
+  }
+  
+  .vault-mechanism {
+    width: 480px; height: 480px; border-radius: 50%; position: relative;
+    background: radial-gradient(circle at 30% 30%, #fff 0%, var(--steel) 100%);
+    box-shadow: 0 48px 96px rgba(17,19,21,0.1), inset 0 2px 4px #fff, inset 0 -4px 12px rgba(17,19,21,0.05), 0 0 0 1px var(--grid-major);
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    transition: all 1s var(--ease-heavy);
+  }
+  
+  /* Concentric Rings */
+  .v-ring-outer {
+    position: absolute; inset: 24px; border-radius: 50%;
+    border: 1px dashed rgba(17,19,21,0.2);
+    animation: rotate 40s linear infinite;
+  }
+  .v-ring-inner {
+    position: absolute; inset: 48px; border-radius: 50%;
+    border: 4px solid transparent; border-top-color: var(--brass); border-bottom-color: var(--brass);
+    animation: rotate 20s linear infinite reverse; opacity: 0.3; transition: opacity 0.5s;
+  }
+  @keyframes rotate { to { transform: rotate(360deg); } }
+  
+  .v-status { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; color: var(--iron); margin-bottom: 8px; position: relative; z-index: 2; transition: color 0.5s;}
+  .v-hash { font-family: 'DM Mono', monospace; font-size: 16px; color: rgba(17,19,21,0.5); position: relative; z-index: 2;}
+
+  .vault-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin-top: 60px; max-width: 600px;}
+
+  /* View 4: Transaction Mission Control */
+  .terminal-overlay {
+    background: var(--iron); color: var(--alum); border-radius: 8px;
+    padding: 60px; box-shadow: 0 64px 128px rgba(0,0,0,0.4);
+    position: relative; overflow: hidden;
+  }
+  .terminal-overlay::before { content:''; position:absolute; top:0; left:0; width:100%; height:4px; background: linear-gradient(90deg, var(--brass), var(--banknote)); }
+  
+  .tx-grid { display: grid; grid-template-columns: 1fr; gap: 40px; text-align: center; }
+  
+  .tx-visualizer {
+    width: 120px; height: 120px; margin: 0 auto; position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* Architectural Hexagon Spinner */
+  .hex-spin {
+    position: absolute; inset: 0;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    border: 2px solid rgba(255,255,255,0.1);
+    animation: spin 3s var(--ease-heavy) infinite;
+  }
+  .hex-inner {
+    width: 60px; height: 60px; background: var(--alum);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    transition: all 0.5s var(--ease-heavy);
+  }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(120deg); } }
+
+  .tx-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+  .tx-sub { font-family: 'DM Mono', monospace; font-size: 14px; color: rgba(255,255,255,0.5); }
+  
+  .tx-progress { width: 100%; height: 2px; background: rgba(255,255,255,0.1); margin-top: 40px; position: relative; }
+  .tx-bar { position: absolute; left: 0; top: 0; height: 100%; background: var(--brass); width: 25%; transition: width 1s var(--ease-heavy); }
+
+  /* View 5: Construction Feed */
+  .feed-container { max-width: 800px; margin: 0 auto; padding-top: 40px; }
+  
+  .feed-timeline { position: relative; }
+  /* The Laser Line */
+  .feed-timeline::before {
+    content:''; position:absolute; left: 40px; top: 0; bottom: 0; width: 2px;
+    background: linear-gradient(to bottom, var(--banknote), rgba(24,66,57,0.1));
+  }
+  
+  .feed-node { display: grid; grid-template-columns: 120px 1fr; gap: 40px; margin-bottom: 40px; position: relative; opacity: 0; transform: translateX(-20px); }
+  /* Animate in via JS when view loads */
+  .feed-node.visible { opacity: 1; transform: translateX(0); transition: all 0.8s var(--ease-heavy); }
+  
+  /* The physical node dot */
+  .feed-node::before {
+    content:''; position:absolute; left: 36px; top: 32px; width: 10px; height: 10px;
+    background: var(--alum); border: 2px solid var(--banknote); border-radius: 50%; z-index: 2;
+  }
+  .feed-node.pulse-node::before {
+    background: var(--banknote); box-shadow: 0 0 0 6px rgba(24,66,57,0.2); animation: pulse 2s infinite;
+  }
+
+  .f-time { text-align: right; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 600; color: rgba(17,19,21,0.5); padding-top: 28px; }
+  
+  .f-content {
+    background: var(--alum); border: 1px solid var(--grid-major); border-radius: 4px;
+    padding: 24px 32px; box-shadow: 0 12px 24px rgba(17,19,21,0.02);
+    font-size: 18px; font-weight: 500; line-height: 1.5;
+  }
+  .f-content strong { color: var(--iron); font-weight: 800; background: linear-gradient(transparent 70%, rgba(191,161,95,0.3) 70%); }
+
+  /* Respect reduced-motion preference — disable non-essential animation */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .v-ring-outer, .v-ring-inner, .hex-spin, .dot-pulse {
+      animation: none !important;
+    }
+  }
+
+  /* Keyboard focus states — visible on all interactive elements */
+  .btn-arch:focus-visible,
+  .wallet-pill:focus-visible,
+  .dock-item:focus-visible,
+  .contract-module:focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 2px;
+  }
+
+  /* Initial Loading Sequence */
+  #preloader {
+    position: fixed; inset: 0; background: var(--iron); z-index: var(--z-preloader);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: var(--alum); transition: opacity 1s var(--ease-heavy);
+  }
+  .p-logo { width: 80px; height: 80px; margin-bottom: 32px; overflow: visible; }
+  .p-text { font-size: 24px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; overflow: hidden; position: relative; }
+  .p-text span { display: inline-block; transform: translateY(100%); animation: slideUp 0.8s var(--ease-heavy) forwards; }
+  @keyframes slideUp { to { transform: translateY(0); } }
+  
+  /* Loading Bar */
+  .p-bar-wrap { width: 200px; height: 2px; background: rgba(255,255,255,0.1); margin-top: 40px; overflow: hidden; }
+  .p-bar { width: 0%; height: 100%; background: var(--brass); animation: loadFill 2s cubic-bezier(0.85, 0, 0.15, 1) forwards; }
+  @keyframes loadFill { 0% { width: 0%; } 50% { width: 40%; } 100% { width: 100%; } }
+

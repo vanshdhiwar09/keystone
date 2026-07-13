@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, DM_Sans } from "next/font/google";
+import { Bricolage_Grotesque, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "../context/WalletContext";
 
@@ -15,8 +15,15 @@ const dmSans = DM_Sans({
   display: "swap",
 });
 
+const dmMono = DM_Mono({
+  weight: ["400", "500", "500"],
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Keystone Escrow Platform",
+  title: "Keystone Escrow Protocol",
   description: "Immutable Structural Web3 Execution Ledger",
 };
 
@@ -26,10 +33,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${dmSans.variable} h-full antialiased font-body`}>
-      <body className="min-h-full flex flex-col bg-steel text-iron selection:bg-banknote selection:text-alum">
+    <html lang="en" className={`${bricolage.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}>
+      <body>
         <WalletProvider>
-          {children}
+          {/* Architectural Blueprint Background Setup */}
+          <div className="environment">
+            <div className="blueprint-grid"></div>
+            <div className="ambient-light"></div>
+            <div className="tactile-noise"></div>
+          </div>
+
+          <div className="app-frame" id="main-app">
+            {children}
+          </div>
         </WalletProvider>
       </body>
     </html>
