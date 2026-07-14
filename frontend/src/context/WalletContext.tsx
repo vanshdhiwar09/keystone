@@ -54,6 +54,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
                     setPublicKey(null);
                     setNetwork(null);
                 }
+            } else {
+                setPublicKey(null);
+                setNetwork(null);
             }
         } catch (error) {
             console.error("Error accessing Freighter API:", error);

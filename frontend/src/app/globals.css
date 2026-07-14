@@ -464,3 +464,8 @@
   .p-bar { width: 0%; height: 100%; background: var(--brass); animation: loadFill 2s cubic-bezier(0.85, 0, 0.15, 1) forwards; }
   @keyframes loadFill { 0% { width: 0%; } 50% { width: 40%; } 100% { width: 100%; } }
 
+
+/* Explorer Row Interactive States */
+.explorer-row { cursor: pointer; border: 1px solid var(--grid-major) !important; background: transparent; transition: all 0.2s ease; }
+.explorer-row:hover { border-color: var(--iron) !important; }
+.explorer-row:focus { border-color: var(--iron) !important; outline: none; box-shadow: 0 0 0 2px var(--steel), 0 0 0 4px var(--brass); }

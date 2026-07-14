@@ -98,11 +98,16 @@ export default function BlueprintView() {
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div
                             key={i}
-                            className="stone-module"
+                            className="stone-module explorer-row"
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setSelectedContract(`${1024 + (page - 1) * 6 + i}`)}
-                            style={{ cursor: "pointer", border: "1px solid var(--grid-major)", background: "transparent", transition: "all 0.2s ease" }}
-                            onMouseOver={(e) => e.currentTarget.style.borderColor = "var(--iron)"}
-                            onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--grid-major)"}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setSelectedContract(`${1024 + (page - 1) * 6 + i}`);
+                                }
+                            }}
                         >
                             <div className="stone-step" style={{ color: "var(--brass)", fontWeight: 800 }}>#{(page - 1) * 6 + i + 1}</div>
                             <div className="stone-content">
