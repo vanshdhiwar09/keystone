@@ -1,8 +1,16 @@
-@import 'tailwindcss';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+<!DOCTYPE html>
+<html lang="en">
 
-
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keystone — The Escrow Protocol</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <style>
     :root {
       /* Core Brand Palette */
       --steel: #F6F7F9;
@@ -1292,4 +1300,642 @@
     .btn-settle:hover {
       background: rgba(22, 26, 29, 0.05);
     }
-  
+  </style>
+</head>
+
+<body>
+
+  <div class="layout-wrapper">
+
+    <!-- Architectural Header -->
+    <header class="global-header">
+      <div class="brand-lockup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L3 21h18L12 2z" stroke="#161A1D" stroke-width="2" stroke-linejoin="round" />
+          <path d="M12 8l4 9H8l4-9z" fill="#BFA15F" stroke="none" />
+        </svg>
+        <h1 class="display">Keystone</h1>
+      </div>
+      <div class="status-vault">
+        <span class="network-tag uppercase">Testnet Active</span>
+        <div class="wallet-id mono">GABC…WXYZ</div>
+      </div>
+    </header>
+
+    <!-- PAGE 1: DASHBOARD -->
+    <main id="view-dashboard" class="page-view active">
+      <div class="dashboard-grid">
+        <div class="hero-statement">
+          <h2 class="display">Work locks in.<br>Trust <em>holds it together.</em></h2>
+          <p>Funds remain cryptographically locked in escrow until milestones are mutually approved. No invoicing, no
+            chasing, no intermediaries.</p>
+
+          <div style="display:flex; gap: 40px; margin-top: 60px;">
+            <div>
+              <p class="mono" style="font-size:32px; font-weight:600; color:var(--iron);">2,140</p>
+              <p class="uppercase" style="color:rgba(22,26,29,0.5);">XLM Secured</p>
+            </div>
+            <div>
+              <p class="mono" style="font-size:32px; font-weight:600; color:var(--iron);">100%</p>
+              <p class="uppercase" style="color:rgba(22,26,29,0.5);">Release Rate</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-container" id="hero-arch-container">
+          <!-- SVG injected via JS for dramatic draw effect -->
+        </div>
+
+        <div class="contracts-section">
+          <div class="section-header">
+            <h3 class="display section-title">Active Contracts</h3>
+            <button class="stone-btn primary" style="padding: 12px 24px; border-radius: 4px; font-size: 12px;"
+              onclick="switchView('view-create', 2)">New Contract</button>
+          </div>
+
+          <div class="contract-list">
+            <div class="contract-module" onclick="showJobDetail()">
+              <div>
+                <p class="c-title display">Landing page redesign</p>
+                <p class="c-meta mono">Client · GFRE…9K2L</p>
+              </div>
+              <div class="c-status">
+                <div class="status-ring ring-active"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="3">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg></div><span class="uppercase" style="color:var(--banknote);">In Progress</span>
+              </div>
+              <div class="c-value mono">450 XLM</div>
+              <div style="text-align:right;"><span style="font-size:24px; opacity:0.3;">→</span></div>
+            </div>
+
+            <div class="contract-module" onclick="showJobDetail()">
+              <div>
+                <p class="c-title display">Smart contract audit</p>
+                <p class="c-meta mono">Freelancer · GABC…WXYZ</p>
+              </div>
+              <div class="c-status">
+                <div class="status-ring ring-dispute"><span style="font-weight:800; font-family:sans-serif;">!</span>
+                </div><span class="uppercase" style="color:var(--oxide);">Disputed</span>
+              </div>
+              <div class="c-value mono">1,200 XLM</div>
+              <div style="text-align:right;"><span style="font-size:24px; opacity:0.3;">→</span></div>
+            </div>
+
+            <div class="contract-module" onclick="showJobDetail()">
+              <div>
+                <p class="c-title display">Brand identity pack</p>
+                <p class="c-meta mono">Client · GQRS…4M1P</p>
+              </div>
+              <div class="c-status">
+                <div class="status-ring ring-done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="3">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg></div><span class="uppercase" style="color:var(--iron);">Complete</span>
+              </div>
+              <div class="c-value mono">300 XLM</div>
+              <div style="text-align:right;"><span style="font-size:24px; opacity:0.3;">→</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- PAGE 2: BLUEPRINT (EXPLORER) -->
+    <main id="view-blueprint-list" class="page-view">
+      <div class="blueprint-explorer-header">
+        <div>
+          <h2 class="display" style="font-size: 40px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px;">
+            Contract Explorer</h2>
+          <p style="color: rgba(22,26,29,0.5);">Browse, filter, and access your active and completed contracts.</p>
+        </div>
+        <input type="text" class="explorer-search" placeholder="Search by ID, Title, or Address..." />
+      </div>
+
+      <div class="contract-list-view">
+        <div class="contract-module" onclick="showJobDetail()">
+          <div>
+            <p class="c-title display">Landing page redesign</p>
+            <p class="c-meta mono">Client · GFRE…9K2L</p>
+          </div>
+          <div class="c-status">
+            <div class="status-ring ring-active"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="3">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg></div><span class="uppercase" style="color:var(--banknote);">In Progress</span>
+          </div>
+          <div class="c-value mono">450 XLM</div>
+          <div style="text-align:right;"><span style="font-size:24px; opacity:0.3;">→</span></div>
+        </div>
+
+        <div class="contract-module" onclick="showJobDetail()">
+          <div>
+            <p class="c-title display">E-commerce Backend</p>
+            <p class="c-meta mono">Client · GD9…32J</p>
+          </div>
+          <div class="c-status">
+            <div class="status-ring ring-done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg></div><span class="uppercase" style="color:var(--iron);">Complete</span>
+          </div>
+          <div class="c-value mono">850 XLM</div>
+          <div style="text-align:right;"><span style="font-size:24px; opacity:0.3;">→</span></div>
+        </div>
+
+        <div class="contract-module" onclick="showJobDetail()">
+          <div>
+            <p class="c-title display">Smart contract audit</p>
+            <p class="c-meta mono">Freelancer · GABC…WXYZ</p>
+          </div>
+          <div class="c-status">
+            <div class="status-ring ring-dispute"><span style="font-weight:800; font-family:sans-serif;">!</span></div>
+            <span class="uppercase" style="color:var(--oxide);">Disputed</span>
+          </div>
+          <div class="c-value mono">1,200 XLM</div>
+          <div style="text-align:right;"><span style="font-size:24px; opacity:0.3;">→</span></div>
+        </div>
+
+        <div class="contract-module" onclick="showJobDetail()">
+          <div>
+            <p class="c-title display">Brand identity pack</p>
+            <p class="c-meta mono">Client · GQRS…4M1P</p>
+          </div>
+          <div class="c-status">
+            <div class="status-ring ring-done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg></div><span class="uppercase" style="color:var(--iron);">Complete</span>
+          </div>
+          <div class="c-value mono">300 XLM</div>
+          <div style="text-align:right;"><span style="font-size:24px; opacity:0.3;">→</span></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- PAGE 2.1: JOB DETAIL (THE BLUEPRINT INNER) -->
+    <main id="view-detail" class="page-view">
+      <button onclick="switchView('view-blueprint-list', 1)" class="btn-back">← Back to Explorer</button>
+      <div class="blueprint-header">
+        <div class="blueprint-title-block">
+          <p class="uppercase" style="color:rgba(22,26,29,0.5); margin-bottom:16px;">Contract 003</p>
+          <h2 class="display">Landing page redesign</h2>
+          <div class="parties-grid">
+            <div>
+              <p class="party-label">Client Address</p>
+              <p class="party-hash mono">GFRE…9K2L</p>
+            </div>
+            <div>
+              <p class="party-label">Freelancer Address</p>
+              <p class="party-hash mono">GABC…WXYZ</p>
+            </div>
+          </div>
+        </div>
+        <div class="escrow-total">
+          <p class="escrow-amount display">1,000<span style="font-size:3rem;">XLM</span></p>
+          <p class="escrow-label">Total Escrow Value</p>
+        </div>
+      </div>
+
+      <div class="structural-timeline">
+
+        <!-- State: Released -->
+        <div class="stone-block stone-approved" style="opacity: 0.85;">
+          <div class="stone-info">
+            <div class="stone-meta">
+              <p>Stage 01 — Funds Released</p>
+              <h3 class="display">Wireframes</h3>
+            </div>
+            <div class="stone-value mono">150 XLM</div>
+          </div>
+          <!-- No actions for released state -->
+        </div>
+
+        <!-- State: Approved (Awaiting Distribution) -->
+        <div class="stone-block stone-approved">
+          <div class="stone-info">
+            <div class="stone-meta">
+              <p>Stage 02 — Approved · Awaiting Distribution</p>
+              <h3 class="display">Visual design</h3>
+            </div>
+            <div class="stone-value mono">200 XLM</div>
+          </div>
+          <div class="stone-actions">
+            <button class="stone-btn danger">Raise Dispute</button>
+            <button class="stone-btn primary">Distribute Funds</button>
+          </div>
+        </div>
+
+        <!-- State: Disputed -->
+        <div class="stone-block stone-disputed">
+          <div class="stone-info">
+            <div class="stone-meta">
+              <p style="color:var(--brass-light);">Stage 03 — Disputed by Client</p>
+              <h3 class="display">Responsive build</h3>
+            </div>
+            <div class="stone-value mono">100 XLM</div>
+          </div>
+          <div class="stone-actions">
+            <button class="stone-btn">Resolve — Release</button>
+            <button class="stone-btn">Resolve — Refund</button>
+          </div>
+        </div>
+
+        <!-- State: Funded / In Progress -->
+        <div class="stone-block" style="border-left: 8px solid var(--banknote);">
+          <div class="stone-info">
+            <div class="stone-meta">
+              <p style="color:var(--banknote);">Stage 04 — Funded · In Progress</p>
+              <h3 class="display">Backend Integration</h3>
+            </div>
+            <div class="stone-value mono">400 XLM</div>
+          </div>
+          <!-- Note to dev: Role-gate these actions. 'Submit' is freelancer only, 'Dispute' is client/freelancer. -->
+          <div class="stone-actions">
+            <button class="stone-btn danger">Raise Dispute</button>
+            <button class="stone-btn primary">Submit Milestone</button>
+          </div>
+        </div>
+
+        <!-- State: Created (Awaiting Funding) -->
+        <div class="stone-block" style="border-left: 8px solid rgba(22,26,29,0.2);">
+          <div class="stone-info">
+            <div class="stone-meta">
+              <p style="color:rgba(22,26,29,0.5);">Stage 05 — Created · Awaiting Funding</p>
+              <h3 class="display">QA & Launch</h3>
+            </div>
+            <div class="stone-value mono">150 XLM</div>
+          </div>
+          <div class="stone-actions">
+            <button class="stone-btn primary">Fund Milestone</button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- PAGE 3: CREATE CONTRACT (DRAFTING BOARD) -->
+    <main id="view-create" class="page-view">
+      <div class="drafting-container">
+        <p class="uppercase"
+          style="color:rgba(22,26,29,0.4); margin-bottom:20px; align-self: flex-start; max-width: 800px; margin-left: auto; margin-right: auto; width: 100%;">
+          Initialize New Contract</p>
+
+        <div class="drafting-board">
+          <div class="draft-header">
+            <h2>Contract Foundation</h2>
+            <p>Define the job parameters and lock in the freelancer before adding milestones.</p>
+          </div>
+
+          <div class="draft-body">
+            <div class="draft-group">
+              <label class="draft-label">Project Title</label>
+              <input type="text" class="draft-input" value="Landing page redesign" />
+            </div>
+
+            <div class="draft-group">
+              <label class="draft-label">Project Description</label>
+              <textarea
+                class="draft-input">Full redesign of the marketing site homepage and pricing page, including mobile layout.</textarea>
+            </div>
+
+            <div class="draft-group">
+              <label class="draft-label">Freelancer Address</label>
+              <input type="text" class="draft-input mono" value="GABC7X9K2LFRE4M1PQRS8T2NHIJKLMNOPQRSTUVWXYZ" />
+            </div>
+
+            <div style="margin-top: 16px;">
+              <label class="draft-label" style="margin-bottom: 20px;">Structural Milestones</label>
+
+              <!-- Milestone 1 -->
+              <div class="milestone-builder-block">
+                <div class="m-header">
+                  <span class="m-pill">Milestone 1</span>
+                  <button class="m-remove">Remove</button>
+                </div>
+                <div class="m-row">
+                  <div>
+                    <label class="draft-label" style="font-size:9px; color:rgba(22,26,29,0.3);">Title</label>
+                    <input type="text" class="draft-input" value="Wireframes" />
+                  </div>
+                  <div class="amount-wrap">
+                    <div style="flex:1;">
+                      <label class="draft-label" style="font-size:9px; color:rgba(22,26,29,0.3);">Amount</label>
+                      <input type="text" class="draft-input" value="150" />
+                    </div>
+                    <span style="padding-top:20px;">XLM</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Milestone 2 -->
+              <div class="milestone-builder-block">
+                <div class="m-header">
+                  <span class="m-pill">Milestone 2</span>
+                  <button class="m-remove">Remove</button>
+                </div>
+                <div class="m-row">
+                  <div>
+                    <label class="draft-label" style="font-size:9px; color:rgba(22,26,29,0.3);">Title</label>
+                    <input type="text" class="draft-input" value="Visual design + mobile layout" />
+                  </div>
+                  <div class="amount-wrap">
+                    <div style="flex:1;">
+                      <label class="draft-label" style="font-size:9px; color:rgba(22,26,29,0.3);">Amount</label>
+                      <input type="text" class="draft-input" value="300" />
+                    </div>
+                    <span style="padding-top:20px;">XLM</span>
+                  </div>
+                </div>
+              </div>
+
+              <button class="btn-add-milestone">+ Add Milestone</button>
+            </div>
+          </div>
+
+          <div class="draft-footer">
+            <div class="draft-summary">
+              2 milestones · <strong>450 XLM</strong> total · 3 signatures required
+            </div>
+            <button class="btn-deploy">Deploy Contract</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- PAGE 4: TRANSACTION THEATER -->
+    <main id="view-tx" class="page-view">
+      <div class="tx-theater">
+        <div class="tx-modal" id="tx-ui">
+          <div class="tx-icon-wrap" id="tx-icon">
+            <div class="spinner-architectural"></div>
+          </div>
+          <h3 class="display" id="tx-title">Waiting for signature</h3>
+          <p class="mono" id="tx-sub">Confirm request in Freighter</p>
+
+          <div class="tx-states">
+            <div class="tx-dot active" onclick="setTxState(0)"></div>
+            <div class="tx-dot" onclick="setTxState(1)"></div>
+            <div class="tx-dot" onclick="setTxState(2)"></div>
+            <div class="tx-dot" onclick="setTxState(3)"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- PAGE 5: ACTIVITY FEED -->
+    <main id="view-feed" class="page-view">
+      <div class="feed-layout">
+        <div class="feed-title-col">
+          <h2 class="feed-title display">LIVE<br>FEED</h2>
+        </div>
+        <div class="timeline-feed">
+          <div class="feed-node live">
+            <div class="feed-time">JUST NOW</div>
+            <div class="feed-content">
+              <p class="feed-text">Milestone <strong>Visual design</strong> approved by Client.</p>
+            </div>
+          </div>
+          <div class="feed-node">
+            <div class="feed-time">2 MIN AGO</div>
+            <div class="feed-content">
+              <p class="feed-text">Milestone <strong>Wireframes</strong> released. 150 XLM distributed to Freelancer.
+              </p>
+            </div>
+          </div>
+          <div class="feed-node">
+            <div class="feed-time">14 MIN AGO</div>
+            <div class="feed-content">
+              <p class="feed-text">Freelancer submitted <strong>Wireframes</strong> for review.</p>
+            </div>
+          </div>
+          <div class="feed-node">
+            <div class="feed-time">1 HR AGO</div>
+            <div class="feed-content">
+              <p class="feed-text">Client funded contract. <strong>450 XLM</strong> cryptographically locked.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- PAGE 6: DISPUTES (ARBITER DASHBOARD) -->
+    <main id="view-disputes" class="page-view">
+      <div class="arbiter-grid">
+        <div class="arbiter-header">
+          <h3 class="display section-title">Arbiter Jurisdiction</h3>
+        </div>
+
+        <div class="dispute-list">
+          <div class="dispute-module">
+            <div class="d-top">
+              <div>
+                <p class="d-title display">Smart contract audit</p>
+                <p class="d-meta">Contract 002 · Stage 03 Disputed</p>
+                <span class="m-pill" style="background:rgba(164,76,39,0.1); color:var(--oxide); box-shadow:none;">Escrow
+                  Frozen</span>
+              </div>
+
+              <div class="d-parties">
+                <div class="d-party-row"><span>Client</span> GC8...41K</div>
+                <div class="d-party-row"><span>Freelancer</span> GABC…WXYZ</div>
+              </div>
+
+              <div class="d-value">1,200 XLM</div>
+            </div>
+
+            <div class="d-reason">
+              <p class="d-reason-label">Dispute Reason provided by Client:</p>
+              <p class="d-reason-text">"The deliverables provided do not match the specified requirements in the
+                structural milestone. Missing complete unit test coverage as agreed."</p>
+            </div>
+
+            <div class="d-actions">
+              <button class="btn-settle">Settle to Client</button>
+              <button class="btn-settle">Settle to Freelancer</button>
+            </div>
+          </div>
+
+          <div class="dispute-module" style="opacity: 0.6; filter: grayscale(1); pointer-events: none;">
+            <div class="d-top">
+              <div>
+                <p class="d-title display" style="text-decoration: line-through;">E-commerce Backend</p>
+                <p class="d-meta">Contract 014 · Stage 02 Disputed</p>
+                <span class="m-pill" style="background:var(--iron); color:var(--alum); box-shadow:none;">Resolved</span>
+              </div>
+
+              <div class="d-parties">
+                <div class="d-party-row"><span>Client</span> GD9...32J</div>
+                <div class="d-party-row"><span>Freelancer</span> GXYZ...99A</div>
+              </div>
+
+              <div class="d-value" style="color: var(--iron);">850 XLM</div>
+            </div>
+
+            <div class="d-reason">
+              <p class="d-reason-label">Resolution Note:</p>
+              <p class="d-reason-text">"Arbiter reviewed codebase. Freelancer provided necessary commits. Settled in
+                favor of Freelancer."</p>
+            </div>
+
+            <div class="d-actions" style="justify-content: center;">
+              <p
+                style="font-family:'DM Sans', sans-serif; font-size:11px; font-weight:700; color:var(--iron); text-transform:uppercase; text-align:center; padding: 12px;">
+                Settled to Freelancer</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Floating Navigation Dock -->
+  <nav class="floating-dock">
+    <button class="dock-btn active" onclick="switchView('view-dashboard', 0)">Dashboard</button>
+    <button class="dock-btn" onclick="switchView('view-blueprint-list', 1)">Blueprint</button>
+    <button class="dock-btn" onclick="switchView('view-create', 2)">Create</button>
+    <button class="dock-btn" onclick="switchView('view-tx', 3)">Terminal</button>
+    <button class="dock-btn" onclick="switchView('view-feed', 4)">Pulse</button>
+    <button class="dock-btn" onclick="switchView('view-disputes', 5)">Disputes</button>
+  </nav>
+
+  <script>
+    // Main Navigation Logic
+    function switchView(viewId, btnIndex) {
+      // Hide all views
+      document.querySelectorAll('.page-view').forEach(v => {
+        v.classList.remove('active');
+      });
+
+      // Show target view & force reflow for animation
+      const newView = document.getElementById(viewId);
+      if (newView) {
+        void newView.offsetWidth;
+        newView.classList.add('active');
+      }
+
+      // Update dock active states
+      const btns = document.querySelectorAll('.dock-btn');
+      btns.forEach(b => b.classList.remove('active'));
+      if (btns[btnIndex]) {
+        btns[btnIndex].classList.add('active');
+      }
+
+      // Trigger specialized drawing animation if returning to dashboard
+      if (viewId === 'view-dashboard') {
+        if (typeof animateArch === 'function') animateArch();
+      }
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Helper to transition from Explorer List to Job Detail
+    function showJobDetail() {
+      document.querySelectorAll('.page-view').forEach(v => v.classList.remove('active'));
+      const detailView = document.getElementById('view-detail');
+      void detailView.offsetWidth;
+      detailView.classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Dock stays on Blueprint index (1)
+    }
+
+    // Complex SVG Arch Drawing Animation
+    function animateArch() {
+      const container = document.getElementById('hero-arch-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 400 300');
+
+      const cx = 200, cy = 250, r1 = 120, r2 = 180;
+      const stones = 9;
+      const startAngle = 180, endAngle = 0;
+
+      for (let i = 0; i < stones; i++) {
+        const a0 = startAngle - (i / stones) * (startAngle - endAngle);
+        const a1 = startAngle - ((i + 1) / stones) * (startAngle - endAngle);
+        const rad0 = a0 * Math.PI / 180, rad1 = a1 * Math.PI / 180;
+
+        const x1 = cx + r1 * Math.cos(rad0), y1 = cy - r1 * Math.sin(rad0);
+        const x2 = cx + r2 * Math.cos(rad0), y2 = cy - r2 * Math.sin(rad0);
+        const x3 = cx + r2 * Math.cos(rad1), y3 = cy - r2 * Math.sin(rad1);
+        const x4 = cx + r1 * Math.cos(rad1), y4 = cy - r1 * Math.sin(rad1);
+
+        const isKeystone = i === Math.floor(stones / 2);
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M${x1},${y1} L${x2},${y2} L${x3},${y3} L${x4},${y4} Z`);
+        path.classList.add('voussoir');
+
+        // Initial State for drawing
+        const length = 500;
+        path.style.strokeDasharray = length;
+        path.style.strokeDashoffset = length;
+
+        if (isKeystone) {
+          path.style.stroke = '#BFA15F';
+          path.style.strokeWidth = '2px';
+        }
+
+        svg.appendChild(path);
+
+        // Animate Draw then Fill
+        setTimeout(() => {
+          path.style.strokeDashoffset = '0';
+          setTimeout(() => {
+            if (isKeystone) {
+              path.style.fill = '#BFA15F';
+              path.style.filter = 'drop-shadow(0 0 20px rgba(191,161,95,0.6))';
+              path.style.transform = 'translateY(-10px)';
+            } else {
+              path.style.fill = 'rgba(255,255,255,0.8)';
+            }
+          }, 800);
+        }, i * 100);
+      }
+      container.appendChild(svg);
+    }
+
+    // Transaction Theater States
+    const txData = [
+      { t: 'Waiting for signature', s: 'Confirm request in Freighter', color: 'var(--alum)', bg: 'var(--iron)', icon: '<div class="spinner-architectural"></div>' },
+      { t: 'Submitting to network', s: 'Processing cryptographic proof', color: 'var(--brass)', bg: 'var(--iron)', icon: '<div class="spinner-architectural" style="border-color:var(--brass);"></div>' },
+      { t: 'Confirmed', s: 'Milestone funded successfully', color: 'var(--iron)', bg: 'var(--alum)', icon: '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--banknote)" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>' },
+      { t: 'Transaction Failed', s: 'Signature rejected', color: 'var(--alum)', bg: 'var(--oxide)', icon: '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' }
+    ];
+
+    function setTxState(index) {
+      const ui = document.getElementById('tx-ui');
+      const icon = document.getElementById('tx-icon');
+      const title = document.getElementById('tx-title');
+      const sub = document.getElementById('tx-sub');
+      const dots = document.querySelectorAll('.tx-dot');
+
+      dots.forEach(d => d.classList.remove('active'));
+      if (dots[index]) dots[index].classList.add('active');
+
+      const data = txData[index];
+
+      ui.style.transform = 'scale(0.98)';
+      setTimeout(() => {
+        ui.style.background = data.bg;
+        ui.style.color = data.color;
+        icon.innerHTML = data.icon;
+        title.innerText = data.t;
+        sub.innerText = data.s;
+        ui.style.transform = 'scale(1)';
+      }, 150);
+    }
+
+    // Initialize
+    window.onload = () => {
+      animateArch();
+    };
+  </script>
+
+</body>
+
+</html>

@@ -1,0 +1,1 @@
+const { rpc } = require('@stellar/stellar-sdk'); async function test() { const server = new rpc.Server('https://soroban-testnet.stellar.org'); try { const account = await server.getAccount('GCQU3TJYNVZ2VJUGM3JDI7XWO4URSCNG5UJRFMKVOJOYDRLXYXQFJM6K'); console.log('Success:', account.accountId()); } catch(e) { console.error('Test Error:', e.message); } } test();
