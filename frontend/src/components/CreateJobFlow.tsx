@@ -1,129 +1,403 @@
 "use client";
 
 import { useState } from "react";
-import { StrKey } from "@stellar/stellar-sdk";
+import { StrKey, TransactionBuilder, xdr, scValToNative } from "@stellar/stellar-sdk";
+import { signTransaction, signMessage } from "@stellar/freighter-api";
 import { useWallet } from "../context/WalletContext";
+import { useTx } from "../context/TransactionContext";
+import {
+    txCreateJob,
+    txAddMilestone,
+    txFundMilestone,
+    pollTx,
+    server,
+    TOKEN_CONTRACT_ID
+} from "../lib/soroban";
+import { createJobMetadata } from "../lib/api";
 
-export default function CreateJobFlow() {
-    const { publicKey } = useWallet(); // Inherit explicitly from the centralized Layout source
+interface MilestoneInput {
+    title: string;
+    description: string;
+    amount: string;
+}
+
+function stroopsFromXlm(amount: string): bigint {
+    // Precise string-based conversion — avoids float imprecision (e.g. 0.58 * 1e7 = 5799999.999)
+    const parts = amount.split(".");
+    const whole = parts[0] || "0";
+    const fraction = (parts[1] || "").substring(0, 7).padEnd(7, "0");
+    return BigInt(whole + fraction);
+}
+
+export default function CreateJobFlow({ setView }: { setView?: (v: string) => void }) {
+    const { publicKey } = useWallet();
+    const { setState, resetTx } = useTx();
+
+    // Step state: 1 = Parties, 2 = Milestones, 3 = Metadata, 4 = Deploying
     const [step, setStep] = useState(1);
     const [freelancer, setFreelancer] = useState("");
-    const [amount, setAmount] = useState("");
+    const [milestones, setMilestones] = useState<MilestoneInput[]>([
+        { title: "", description: "", amount: "" }
+    ]);
+    const [jobTitle, setJobTitle] = useState("");
+    const [jobDescription, setJobDescription] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleCreate = async () => {
-        if (!publicKey) return;
+    const addMilestone = () => {
+        setMilestones(prev => [...prev, { title: "", description: "", amount: "" }]);
+    };
 
-        // Stroops Conversion Plan:
-        // JS `parseFloat(amount) * 1e7` causes infamous float tracking bugs (e.g. 0.58 * 1e7 = 5799999.999). 
-        // To strictly avoid this, we process string tokens individually locking precision to 7 decimal spots natively
-        // returning a perfect BigInt scalar mapping perfectly to Soroban i128 standards.
-        const parts = amount.split(".");
-        const whole = parts[0] || "0";
-        const fraction = (parts[1] || "").substring(0, 7).padEnd(7, "0");
-        const amountInStroops = BigInt(whole + fraction).toString();
-
-        console.log("Broadcasting Contract to Soroban...", {
-            clientKey: publicKey,
-            freelancer,
-            humanAmount: amount,
-            stroops: amountInStroops
+    const updateMilestone = (index: number, field: keyof MilestoneInput, value: string) => {
+        setMilestones(prev => {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], [field]: value };
+            return updated;
         });
     };
 
-    // Explicit Gate: Do not expose structural input mutations unless cryptographically bonded
+    const removeMilestone = (index: number) => {
+        if (milestones.length <= 1) return; // Always keep at least 1
+        setMilestones(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const allMilestonesValid = milestones.every(m =>
+        m.title.trim().length > 0 &&
+        m.amount.trim().length > 0 &&
+        parseFloat(m.amount) > 0
+    );
+
+    const handleDeploy = async () => {
+        if (!publicKey || !signTransaction || !signMessage) {
+            setError("Wallet not connected or Freighter unavailable.");
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            // ── STEP 1: create_job ─────────────────────────────────────────────────
+            setState({
+                step: "awaiting_signature",
+                title: "Step 1 of 3: Create Job",
+                sub: "Sign the create_job transaction in Freighter.",
+                progress: 10
+            });
+
+            const createTx = await txCreateJob(publicKey, freelancer, TOKEN_CONTRACT_ID);
+            const { signedTxXdr: signedCreate } = await signTransaction(createTx.toXDR(), {
+                networkPassphrase: "Test SDF Network ; September 2015"
+            });
+
+            setState({ step: "submitting", title: "Step 1 of 3: Create Job", sub: "Broadcasting to the Soroban network…", progress: 20 });
+
+            const submittedCreate = await server.sendTransaction(
+                TransactionBuilder.fromXDR(signedCreate, "Test SDF Network ; September 2015") as any
+            );
+
+            if (submittedCreate.status !== "PENDING") {
+                throw new Error(`Unexpected submission status: ${submittedCreate.status}`);
+            }
+
+            setState({ step: "submitting", title: "Step 1 of 3: Create Job", sub: "Awaiting ledger confirmation…", progress: 30 });
+            const confirmedCreate = await pollTx(submittedCreate.hash);
+
+            // Extract Job ID — read from the confirmed transaction's returnVal via resultMetaXdr
+            // The create_job function returns the new job_id as a u32 ScVal.
+            // We parse it from resultMetaXdr which is reliably populated post-confirmation.
+            let jobId: number | null = null;
+            try {
+                if (confirmedCreate.resultMetaXdr) {
+                    const meta = xdr.TransactionMeta.fromXDR(confirmedCreate.resultMetaXdr, "base64");
+                    // V3 meta stores operation results in sorobanMeta
+                    const retval = (meta as any).v3?.sorobanMeta?.returnValue;
+                    if (retval) {
+                        jobId = Number(scValToNative(retval));
+                    }
+                }
+            } catch {
+                // If extraction fails, throw so the user knows to check Stellar Expert
+                throw new Error("Could not read Job ID from on-chain response. Check Stellar Expert for the transaction.");
+            }
+
+            if (jobId === null || jobId === undefined || isNaN(jobId)) {
+                throw new Error("Invalid Job ID returned from create_job.");
+            }
+
+
+            // ── STEP 2: add_milestone × N ──────────────────────────────────────────
+            for (let i = 0; i < milestones.length; i++) {
+                const m = milestones[i];
+                const amountInStroops = stroopsFromXlm(m.amount);
+
+                setState({
+                    step: "awaiting_signature",
+                    title: `Step 2 of 3: Add Milestone ${i + 1}/${milestones.length}`,
+                    sub: `Sign add_milestone for "${m.title}" in Freighter.`,
+                    progress: 35 + Math.floor((i / milestones.length) * 20)
+                });
+
+                const addTx = await txAddMilestone(publicKey, jobId, amountInStroops);
+                const { signedTxXdr: signedAdd } = await signTransaction(addTx.toXDR(), {
+                    networkPassphrase: "Test SDF Network ; September 2015"
+                });
+
+                setState({
+                    step: "submitting",
+                    title: `Step 2 of 3: Add Milestone ${i + 1}/${milestones.length}`,
+                    sub: "Confirming on ledger…",
+                    progress: 40 + Math.floor((i / milestones.length) * 20)
+                });
+
+                const addSubmit = await server.sendTransaction(
+                    TransactionBuilder.fromXDR(signedAdd, "Test SDF Network ; September 2015") as any
+                );
+                if (addSubmit.status !== "PENDING") throw new Error(`add_milestone submit failed: ${addSubmit.status}`);
+                await pollTx(addSubmit.hash);
+            }
+
+            // ── STEP 3: fund_milestone × N ─────────────────────────────────────────
+            for (let i = 0; i < milestones.length; i++) {
+                const milestoneId = i + 1;
+
+                setState({
+                    step: "awaiting_signature",
+                    title: `Step 3 of 3: Fund Milestone ${i + 1}/${milestones.length}`,
+                    sub: `Sign fund_milestone #${milestoneId} in Freighter.`,
+                    progress: 60 + Math.floor((i / milestones.length) * 20)
+                });
+
+                const fundTx = await txFundMilestone(publicKey, jobId, milestoneId);
+                const { signedTxXdr: signedFund } = await signTransaction(fundTx.toXDR(), {
+                    networkPassphrase: "Test SDF Network ; September 2015"
+                });
+
+                setState({
+                    step: "submitting",
+                    title: `Step 3 of 3: Fund Milestone ${i + 1}/${milestones.length}`,
+                    sub: "Confirming on ledger…",
+                    progress: 65 + Math.floor((i / milestones.length) * 20)
+                });
+
+                const fundSubmit = await server.sendTransaction(
+                    TransactionBuilder.fromXDR(signedFund, "Test SDF Network ; September 2015") as any
+                );
+                if (fundSubmit.status !== "PENDING") throw new Error(`fund_milestone submit failed: ${fundSubmit.status}`);
+                await pollTx(fundSubmit.hash);
+            }
+
+            // ── STEP 4: Register metadata in backend (with signMessage) ────────────
+            setState({
+                step: "awaiting_signature",
+                title: "Finalizing: Register Metadata",
+                sub: "Sign identity proof for off-chain indexing.",
+                progress: 85
+            });
+
+            const timestamp = Date.now();
+            const messageToSign = `Keystone job creation: job=${jobId} client=${publicKey} ts=${timestamp}`;
+            const { signedMessage: signedMsg } = await signMessage(messageToSign, { address: publicKey });
+
+            await createJobMetadata({
+                jobId,
+                title: jobTitle,
+                description: jobDescription,
+                clientAddress: publicKey,
+                freelancerAddress: freelancer,
+                milestones: milestones.map(m => ({ title: m.title, description: m.description })),
+                timestamp,
+                signedMessage: signedMsg
+            });
+
+            // ── DONE ───────────────────────────────────────────────────────────────
+            setState({
+                step: "confirmed",
+                title: "Contract Deployed",
+                sub: `Job #${jobId} is live on-chain and indexed.`,
+                progress: 100
+            });
+
+            setStep(4); // Show success state
+
+        } catch (e: any) {
+            const msg = e?.message || String(e);
+            setError(msg);
+            setState({
+                step: "error",
+                title: "Deployment Failed",
+                sub: msg,
+                progress: 0,
+                errorLevel: true
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // ── NOT CONNECTED ──────────────────────────────────────────────────────────
     if (!publicKey) {
         return (
-            <div className="flex flex-col w-full max-w-[90%] sm:max-w-lg mx-auto py-8">
-                <div className="p-10 border border-limestone bg-steel relative shadow-inner text-center flex flex-col items-center justify-center">
-                    <h2 className="font-display font-bold text-xl text-iron uppercase tracking-tight mb-2 opacity-60">Vault Locked</h2>
-                    <p className="text-iron/60 text-xs max-w-xs">Securely connect your Explorer wallet above to instantiate a new structural sequence.</p>
+            <div className="page-view active" id="view-create">
+                <div style={{ maxWidth: 600, margin: "80px auto", textAlign: "center", padding: "60px 40px", border: "1px solid var(--iron)", background: "var(--alum)" }}>
+                    <p className="cad-label" style={{ marginBottom: 16 }}>Access Restricted</p>
+                    <h2 className="display" style={{ fontSize: 28, marginBottom: 12 }}>Vault Locked</h2>
+                    <p style={{ color: "rgba(22,26,29,0.5)", fontSize: 14 }}>Connect your Freighter wallet to initialize a new structural sequence.</p>
                 </div>
             </div>
         );
     }
 
-    return (
-        <div className="flex flex-col w-full max-w-[90%] sm:max-w-lg mx-auto py-8">
-
-            {/* Step 1: Foundation Block */}
-            <div className={`p-6 border border-limestone bg-alum transition-all duration-300 relative z-10 shadow-[0_4px_20px_rgba(0,0,0,0.02)]`}>
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-display font-bold text-xl text-iron uppercase tracking-tight">1. Contract Foundation</h2>
-                    {step > 1 && <span className="text-banknote text-[10px] font-bold tracking-tight uppercase">Docked</span>}
-                </div>
-                <p className="text-iron/60 text-xs mb-4 max-w-sm">Specify the destination freelancer public key for this escrow lock.</p>
-
-                <input
-                    type="text"
-                    placeholder="G..."
-                    value={freelancer}
-                    onChange={(e) => setFreelancer(e.target.value)}
-                    disabled={step > 1}
-                    className="w-full bg-steel border border-limestone p-3 text-sm font-mono text-iron outline-none focus:border-banknote transition-colors disabled:opacity-50"
-                />
-
-                {/* Validates the exact mathematical ED25519 signature curve matching Freighter constraints */}
-                {step === 1 && StrKey.isValidEd25519PublicKey(freelancer) && (
-                    <button
-                        onClick={() => setStep(2)}
-                        className="mt-5 px-5 py-2.5 bg-iron text-alum text-[11px] font-bold uppercase tracking-tight hover:bg-iron/90 focus:outline-2 focus:outline-offset-2 focus:outline-banknote transition-colors"
-                    >
-                        Dock Foundation
+    // ── SUCCESS STATE ──────────────────────────────────────────────────────────
+    if (step === 4) {
+        return (
+            <div className="page-view active" id="view-create">
+                <div style={{ maxWidth: 600, margin: "80px auto", textAlign: "center", padding: "60px 40px", border: "1px solid var(--brass)", background: "var(--alum)" }}>
+                    <p className="cad-label" style={{ color: "var(--brass)", marginBottom: 16 }}>Contract Deployed</p>
+                    <h2 className="display" style={{ fontSize: 32, marginBottom: 12 }}>Escrow Live</h2>
+                    <p style={{ color: "rgba(22,26,29,0.6)", fontSize: 14, marginBottom: 32 }}>Your contract has been committed to the Soroban ledger and indexed off-chain.</p>
+                    <button className="btn-massive" onClick={() => { resetTx(); setStep(1); setFreelancer(""); setMilestones([{ title: "", description: "", amount: "" }]); setJobTitle(""); setJobDescription(""); if (setView) setView("dashboard"); }}>
+                        Return to Dashboard
                     </button>
-                )}
+                </div>
             </div>
+        );
+    }
 
-            {/* Step 2: Value Constraints */}
-            {step >= 2 && (
-                <div className="mt-[-1px] p-6 border border-limestone bg-alum relative z-20 shadow-[0_4px_20px_rgba(0,0,0,0.02)] animate-[fade-in_300ms_ease-out]">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-display font-bold text-xl text-iron uppercase tracking-tight">2. Value Constraint</h2>
-                        {step > 2 && <span className="text-banknote text-[10px] font-bold tracking-tight uppercase">Docked</span>}
+    // ── MAIN FORM ──────────────────────────────────────────────────────────────
+    return (
+        <div className="page-view active" id="view-create" style={{ paddingBottom: 120 }}>
+            <div style={{ maxWidth: 680, margin: "0 auto" }}>
+
+                {/* Header */}
+                <div style={{ marginBottom: 48 }}>
+                    <p className="cad-label" style={{ marginBottom: 12 }}>Initialize Contract</p>
+                    <h2 className="display" style={{ fontSize: 36, marginBottom: 8 }}>New Escrow</h2>
+                    <p style={{ color: "rgba(22,26,29,0.5)", fontSize: 14 }}>Deploy a multi-milestone escrow contract to the Stellar Testnet.</p>
+                </div>
+
+                {/* Step 1: Parties */}
+                <div style={{ marginBottom: 32 }}>
+                    <div className="cad-header" style={{ marginBottom: 20 }}>
+                        <h3 className="cad-title display">1. Contract Parties</h3>
+                        {step > 1 && <span className="cad-label" style={{ color: "var(--brass)" }}>Locked</span>}
                     </div>
-                    <p className="text-iron/60 text-xs mb-4 max-w-sm">Determine the exact USDC/XLM value to lock firmly into this milestone.</p>
 
-                    <div className="flex relative items-center">
+                    <div style={{ marginBottom: 16 }}>
+                        <label className="cad-label" style={{ display: "block", marginBottom: 8 }}>Your Address (Client)</label>
+                        <div className="mono" style={{ padding: "12px 16px", background: "rgba(22,26,29,0.04)", border: "1px solid var(--glass-border)", fontSize: 13, wordBreak: "break-all" }}>
+                            {publicKey}
+                        </div>
+                    </div>
+
+                    <div style={{ marginBottom: 20 }}>
+                        <label className="cad-label" style={{ display: "block", marginBottom: 8 }}>Freelancer Public Key</label>
                         <input
-                            type="number"
-                            placeholder="0.00"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            disabled={step > 3}
-                            className="w-full bg-steel border border-limestone p-3 text-sm font-mono text-iron outline-none focus:border-banknote transition-colors disabled:opacity-50"
+                            type="text"
+                            placeholder="G..."
+                            value={freelancer}
+                            onChange={e => setFreelancer(e.target.value)}
+                            disabled={step > 1}
+                            className="mono"
+                            style={{ width: "100%", padding: "12px 16px", border: "1px solid var(--iron)", background: step > 1 ? "rgba(22,26,29,0.04)" : "white", fontSize: 13, outline: "none", boxSizing: "border-box", opacity: step > 1 ? 0.6 : 1 }}
                         />
-                        <span className="absolute right-4 text-iron/40 font-bold text-xs uppercase tracking-tight">wXLM</span>
+                        {freelancer && !StrKey.isValidEd25519PublicKey(freelancer) && (
+                            <p style={{ color: "var(--oxide)", fontSize: 12, marginTop: 6 }}>Invalid Stellar public key</p>
+                        )}
                     </div>
 
-                    {step === 2 && amount && parseFloat(amount) > 0 && (
-                        <button
-                            onClick={() => setStep(3)}
-                            className="mt-5 px-5 py-2.5 bg-iron text-alum text-[11px] font-bold uppercase tracking-tight hover:bg-iron/90 focus:outline-2 focus:outline-offset-2 focus:outline-banknote transition-colors"
-                        >
-                            Dock Constraint
+                    {step === 1 && StrKey.isValidEd25519PublicKey(freelancer) && freelancer !== publicKey && (
+                        <button className="btn-massive" style={{ padding: "12px 32px" }} onClick={() => setStep(2)}>
+                            Lock Parties
                         </button>
                     )}
                 </div>
-            )}
 
-            {/* Step 3: The Keystone (Locking Drop) */}
-            {step === 3 && (
-                <div className="mt-[-1px] p-8 border border-limestone bg-steel relative z-30 flex flex-col items-center shadow-inner animate-[fade-in_500ms_ease-out]">
+                {/* Step 2: Milestones */}
+                {step >= 2 && (
+                    <div style={{ marginBottom: 32 }}>
+                        <div className="cad-header" style={{ marginBottom: 20 }}>
+                            <h3 className="cad-title display">2. Milestones</h3>
+                            {step > 2 && <span className="cad-label" style={{ color: "var(--brass)" }}>Locked</span>}
+                        </div>
 
-                    <p className="text-iron text-xs mb-6 text-center max-w-sm font-medium">
-                        The structural constraints are docked. Engaging this lock will broadcast physical creation and funding hashes directly to the network.
-                    </p>
+                        {milestones.map((m, i) => (
+                            <div key={i} style={{ border: "1px solid var(--glass-border)", padding: "20px", marginBottom: 12, position: "relative" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                                    <span className="cad-label">Milestone {i + 1}</span>
+                                    {milestones.length > 1 && step === 2 && (
+                                        <button onClick={() => removeMilestone(i)} style={{ fontSize: 11, color: "var(--oxide)", background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>REMOVE</button>
+                                    )}
+                                </div>
+                                <input type="text" placeholder="Title" value={m.title} onChange={e => updateMilestone(i, "title", e.target.value)} disabled={step > 2}
+                                    style={{ width: "100%", marginBottom: 8, padding: "10px 14px", border: "1px solid var(--glass-border)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                                <input type="text" placeholder="Description (optional)" value={m.description} onChange={e => updateMilestone(i, "description", e.target.value)} disabled={step > 2}
+                                    style={{ width: "100%", marginBottom: 8, padding: "10px 14px", border: "1px solid var(--glass-border)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <input type="number" placeholder="0.00" value={m.amount} onChange={e => updateMilestone(i, "amount", e.target.value)} disabled={step > 2}
+                                        className="mono" style={{ flex: 1, padding: "10px 14px", border: "1px solid var(--glass-border)", fontSize: 13, outline: "none" }} />
+                                    <span className="cad-label">XLM</span>
+                                </div>
+                            </div>
+                        ))}
 
-                    <button
-                        onClick={handleCreate}
-                        className="w-full max-w-[280px] px-6 py-4 bg-brass text-iron text-sm font-bold uppercase tracking-[0.2em] transition-transform hover:scale-[1.02] focus:outline-4 focus:outline-offset-2 focus:outline-banknote relative"
-                        style={{
-                            clipPath: "polygon(0 0, 100% 0, 92% 100%, 8% 100%)"
-                        }}
-                    >
-                        Lock Contract
-                    </button>
-                </div>
-            )}
+                        {step === 2 && (
+                            <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                                <button onClick={addMilestone} style={{ padding: "10px 20px", border: "1px solid var(--iron)", background: "none", fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", cursor: "pointer" }}>
+                                    + ADD MILESTONE
+                                </button>
+                                {allMilestonesValid && (
+                                    <button className="btn-massive" style={{ padding: "10px 28px" }} onClick={() => setStep(3)}>
+                                        Lock Milestones
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Step 3: Metadata + Deploy */}
+                {step >= 3 && (
+                    <div style={{ marginBottom: 32 }}>
+                        <div className="cad-header" style={{ marginBottom: 20 }}>
+                            <h3 className="cad-title display">3. Job Metadata</h3>
+                        </div>
+
+                        <input type="text" placeholder="Job Title" value={jobTitle} onChange={e => setJobTitle(e.target.value)} disabled={isLoading}
+                            style={{ width: "100%", marginBottom: 12, padding: "12px 16px", border: "1px solid var(--iron)", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+                        <textarea placeholder="Description" value={jobDescription} onChange={e => setJobDescription(e.target.value)} disabled={isLoading} rows={3}
+                            style={{ width: "100%", marginBottom: 20, padding: "12px 16px", border: "1px solid var(--iron)", fontSize: 14, outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+
+                        {error && (
+                            <div style={{ padding: "12px 16px", background: "rgba(164,76,39,0.08)", border: "1px solid var(--oxide)", marginBottom: 16, fontSize: 13, color: "var(--oxide)" }}>
+                                {error}
+                            </div>
+                        )}
+
+                        <div style={{ padding: "20px", border: "1px solid var(--glass-border)", background: "rgba(22,26,29,0.02)", marginBottom: 24 }}>
+                            <p className="cad-label" style={{ marginBottom: 12 }}>Deployment Summary</p>
+                            <p style={{ fontSize: 13, marginBottom: 4 }}>Freelancer: <span className="mono">{freelancer.slice(0, 8)}…{freelancer.slice(-8)}</span></p>
+                            <p style={{ fontSize: 13, marginBottom: 4 }}>Milestones: {milestones.length}</p>
+                            <p style={{ fontSize: 13 }}>
+                                Total: <span className="mono">{milestones.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0).toFixed(2)} XLM</span>
+                            </p>
+                        </div>
+
+                        <p style={{ fontSize: 12, color: "rgba(22,26,29,0.5)", marginBottom: 20 }}>
+                            Freighter will prompt {1 + milestones.length + milestones.length + 1} times total: once to create the job, once per milestone to add, once per milestone to fund, and once to sign an identity proof for off-chain indexing.
+                        </p>
+
+                        <button
+                            className="btn-massive"
+                            style={{ width: "100%", padding: "18px", fontSize: 16, opacity: isLoading ? 0.6 : 1, cursor: isLoading ? "not-allowed" : "pointer" }}
+                            onClick={handleDeploy}
+                            disabled={isLoading || !jobTitle.trim()}
+                        >
+                            {isLoading ? "Deploying…" : "Deploy Contract"}
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

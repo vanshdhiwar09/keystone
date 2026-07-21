@@ -1,10 +1,13 @@
+"use client";
+
 import { useEffect, useState } from "react";
+import { useWallet } from "../../context/WalletContext";
+import { fetchJobData } from "../../lib/soroban";
 
 function HeroArch() {
+    // ... Original HeroArch retained precisely
     const [mounted, setMounted] = useState(false);
-    useEffect(() => {
-        setTimeout(() => setMounted(true), 50);
-    }, []);
+    useEffect(() => { setTimeout(() => setMounted(true), 50); }, []);
 
     const stones = 9;
     const paths = Array.from({ length: stones }).map((_, i) => {
@@ -13,7 +16,6 @@ function HeroArch() {
         const a0 = startAngle - (i / stones) * (startAngle - endAngle);
         const a1 = startAngle - ((i + 1) / stones) * (startAngle - endAngle);
         const rad0 = (a0 * Math.PI) / 180, rad1 = (a1 * Math.PI) / 180;
-
         const x1 = cx + r1 * Math.cos(rad0), y1 = cy - r1 * Math.sin(rad0);
         const x2 = cx + r2 * Math.cos(rad0), y2 = cy - r2 * Math.sin(rad0);
         const x3 = cx + r2 * Math.cos(rad1), y3 = cy - r2 * Math.sin(rad1);
@@ -24,25 +26,13 @@ function HeroArch() {
         const delay = isKeystone ? 1000 : (i < 4 ? i * 150 : (8 - i) * 150);
 
         const style = mounted ? {
-            opacity: 1,
-            transform: 'translateY(0)',
-            stroke: isKeystone ? 'var(--brass)' : 'var(--iron)',
-            fill: isKeystone ? 'var(--brass)' : 'var(--alum)',
-            filter: isKeystone ? 'drop-shadow(0 0 24px rgba(191,161,95,0.8))' : 'none',
-            strokeWidth: '1.5px',
-            strokeDasharray: 400,
-            strokeDashoffset: 0,
-            transition: `all 0.8s cubic-bezier(0.85, 0, 0.15, 1) ${delay}ms`
+            opacity: 1, transform: 'translateY(0)', stroke: isKeystone ? 'var(--brass)' : 'var(--iron)',
+            fill: isKeystone ? 'var(--brass)' : 'var(--alum)', filter: isKeystone ? 'drop-shadow(0 0 24px rgba(191,161,95,0.8))' : 'none',
+            strokeWidth: '1.5px', strokeDasharray: 400, strokeDashoffset: 0, transition: `all 0.8s cubic-bezier(0.85, 0, 0.15, 1) ${delay}ms`
         } : {
-            opacity: isKeystone ? 0 : 1,
-            transform: isKeystone ? 'translateY(-40px)' : 'translateY(0)',
-            fill: 'transparent',
-            stroke: 'var(--iron)',
-            strokeWidth: '1.5px',
-            strokeDasharray: 400,
-            strokeDashoffset: 400,
-            filter: 'none',
-            transition: `all 0.8s cubic-bezier(0.85, 0, 0.15, 1)`
+            opacity: isKeystone ? 0 : 1, transform: isKeystone ? 'translateY(-40px)' : 'translateY(0)',
+            fill: 'transparent', stroke: 'var(--iron)', strokeWidth: '1.5px', strokeDasharray: 400, strokeDashoffset: 400,
+            filter: 'none', transition: `all 0.8s cubic-bezier(0.85, 0, 0.15, 1)`
         };
 
         return <path key={i} d={d} style={style} />;
@@ -57,8 +47,45 @@ function HeroArch() {
 }
 
 export default function DashboardView({ setView }: { setView: (v: string) => void }) {
+    const { publicKey } = useWallet();
+    const [jobs, setJobs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [tvl, setTvl] = useState(0);
+
+    const truncate = (str: string) => `${str.slice(0, 4)}…${str.slice(-4)}`;
+
+    // Existing "hardcoded scan" logic rewritten gracefully restoring Day 11 logic
+    useEffect(() => {
+        let active = true;
+        async function fetchJobs() {
+            if (!publicKey) return;
+            setLoading(true);
+            const found: any[] = [];
+            let cumulativeXlm = 0;
+
+
+            for (let i = 1; i <= 5; i++) {
+                try {
+                    const val = await fetchJobData(i, publicKey);
+                    if (val && (val.client === publicKey || val.freelancer === publicKey)) {
+                        found.push({ id: i, data: val });
+                    }
+                } catch {
+                    // Job doesn't exist at this ID, continue scanning
+                }
+            }
+            if (active) {
+                setJobs(found);
+                setTvl(cumulativeXlm);
+                setLoading(false);
+            }
+        }
+        fetchJobs();
+        return () => { active = false; };
+    }, [publicKey]);
+
     return (
-        <main className="view active-view" id="view-dashboard">
+        <main className="page-view active animate-[fade-in_400ms_ease-out]" id="view-dashboard">
             <div className="hero-grid-layout">
                 <div className="hero-statement stagger-2">
                     <p className="cad-label" style={{ marginBottom: "16px" }}>System Protocol v2.4</p>
@@ -74,11 +101,11 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
             <div className="data-girder stagger-4">
                 <div className="data-block">
                     <span className="cad-label">Total Volume Locked</span>
-                    <span className="data-value mono">2,140 XLM</span>
+                    <span className="data-value mono">{tvl} XLM</span>
                 </div>
                 <div className="data-block" style={{ paddingLeft: "40px" }}>
                     <span className="cad-label">Active Contracts</span>
-                    <span className="data-value mono">7.00</span>
+                    <span className="data-value mono">{jobs.length}.00</span>
                 </div>
                 <div className="data-block" style={{ paddingLeft: "40px" }}>
                     <span className="cad-label">Distribution Rate</span>
@@ -86,47 +113,43 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                 </div>
             </div>
 
-            <div className="stagger-4" style={{ animationDelay: "0.5s" }}>
-                <div className="cad-header">
-                    <h3 className="cad-title display">Active Architecture</h3>
-                    <button className="btn-arch">Initialize Contract</button>
+            <div className="stagger-4" style={{ animationDelay: "0.5s", marginTop: "60px" }}>
+                <div className="blueprint-header" style={{ marginBottom: "40px" }}>
+                    <h3 className="section-title display">Active Architecture</h3>
+                    <button className="btn-massive" style={{ padding: "12px 24px", minWidth: "200px" }} onClick={() => setView('create')}>Initialize Contract</button>
                 </div>
 
-                {/* Module 1 */}
-                <div className="contract-module" onClick={() => setView('blueprint')} role="button" tabIndex={0}>
-                    <div className="c-id">#003</div>
-                    <div>
-                        <h4 className="c-name display">Landing page redesign</h4>
-                        <p className="c-parties">Client: GFRE…9K2L</p>
-                    </div>
-                    <div className="status-indicator"><div className="dot-pulse"></div> In Progress</div>
-                    <div className="c-amount">450 XLM</div>
-                </div>
+                {loading && <p className="cad-label text-center pt-8">Scanning Cryptographic Architecture...</p>}
 
-                {/* Module 2 */}
-                <div className="contract-module">
-                    <div className="c-id" style={{ color: "var(--oxide)", background: "rgba(164,76,39,0.1)" }}>#002</div>
-                    <div>
-                        <h4 className="c-name display">Smart contract audit</h4>
-                        <p className="c-parties">Freelancer: GABC…WXYZ</p>
-                    </div>
-                    <div className="status-indicator" style={{ color: "var(--oxide)" }}><div className="dot-pulse" style={{ background: "var(--oxide)", animation: "none" }}></div> Disputed</div>
-                    <div className="c-amount">1,200 XLM</div>
-                </div>
+                {jobs.map(job => {
+                    const statusStr = job.data.status ? (Array.isArray(job.data.status) ? job.data.status[0] : job.data.status) : "Active";
 
-                {/* Module 3 */}
-                <div className="contract-module">
-                    <div className="c-id" style={{ color: "var(--iron)", background: "rgba(17,19,21,0.05)" }}>#001</div>
-                    <div>
-                        <h4 className="c-name display">Brand identity pack</h4>
-                        <p className="c-parties">Client: GQRS…4M1P</p>
+                    return (
+                        <div key={job.id} className="contract-module" onClick={() => setView('blueprint')} role="button" tabIndex={0}>
+                            <div>
+                                <p className="c-title display">Contract {job.id.toString().padStart(3, '0')}</p>
+                                <p className="c-meta mono">Client: {truncate(job.data.client)}</p>
+                            </div>
+                            <div className="c-status">
+                                <span className="status-dot" style={{ background: statusStr === 'Disputed' ? 'var(--oxide)' : 'var(--brass)' }}></span>
+                                <span style={{ fontFamily: '"DM Sans", sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                    {statusStr}
+                                </span>
+                            </div>
+                            <div className="c-meta mono">{job.data.milestone_count || 0} Milestones</div>
+                            <div className="c-value mono">*** XLM</div>
+                        </div>
+                    );
+                })}
+
+                {!loading && jobs.length === 0 && (
+                    <div className="contract-module" style={{ opacity: 0.5, pointerEvents: "none" }}>
+                        <div>
+                            <p className="c-title display">No Active Contracts</p>
+                            <p className="c-meta">Awaiting Deployments</p>
+                        </div>
                     </div>
-                    <div className="status-indicator" style={{ color: "var(--iron)" }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        Complete
-                    </div>
-                    <div className="c-amount">300 XLM</div>
-                </div>
+                )}
             </div>
         </main>
     );

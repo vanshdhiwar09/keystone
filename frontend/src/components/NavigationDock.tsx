@@ -7,7 +7,7 @@ interface DockProps {
 }
 
 export default function NavigationDock({ activeView, setActiveView }: DockProps) {
-    const dockRef = useRef<HTMLNavElement>(null);
+    const dockRef = useRef<HTMLElement>(null);
     const indRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
