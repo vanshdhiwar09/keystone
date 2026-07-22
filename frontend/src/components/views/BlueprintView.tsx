@@ -36,14 +36,15 @@ function MilestoneActions({
         ? "Test SDF Network ; September 2015"
         : "Public Global Stellar Network ; September 2015";
 
-    async function exec(fn: () => Promise<{ xdr: string }>, label: string) {
+    async function exec(fn: () => Promise<any>, label: string) {
         if (!publicKey) return;
         setWorking(true);
         setMsg(`Preparing ${label}…`);
         try {
-            const { xdr } = await fn();
+            const tx = await fn();
             setMsg("Sign in Freighter…");
-            const { signedTxXdr } = await signTransaction(xdr, { networkPassphrase: passphrase, address: publicKey });
+            const xdrStr = typeof tx === "string" ? tx : tx.toXDR();
+            const { signedTxXdr } = await signTransaction(xdrStr, { networkPassphrase: passphrase, address: publicKey });
             setMsg(`${label} submitted ✓`);
             setTimeout(() => setMsg(""), 3000);
             console.log("Signed XDR:", signedTxXdr);
