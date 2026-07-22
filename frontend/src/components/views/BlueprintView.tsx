@@ -1,132 +1,338 @@
-import { useState } from "react";
+"use client";
 
-export default function BlueprintView() {
-    const [selectedContract, setSelectedContract] = useState<string | null>(null);
-    const [search, setSearch] = useState("");
-    const [page, setPage] = useState(1);
+import { useState, useEffect, useCallback } from "react";
+import { useWallet } from "../../context/WalletContext";
+import { fetchJobData, txSubmitMilestone, txApproveMilestone, txRaiseDispute } from "../../lib/soroban";
 
-    // --- DETAIL VIEW ---
-    if (selectedContract) {
-        return (
-            <main id="view-detail" className="view active-view" style={{ animation: "none", opacity: 1, transform: "none" }}>
-                <div style={{ marginBottom: "20px", display: "flex", justifyContent: "flex-end" }}>
-                    <button onClick={() => setSelectedContract(null)} className="btn-arch btn-outline" style={{ padding: "8px 16px", fontSize: "10px", borderColor: "var(--grid-major)" }}>
-                        Close Architecture
-                    </button>
-                </div>
+import { fetchJobMetadata, JobMetadataPayload } from "../../lib/api";
+import { signTransaction } from "@stellar/freighter-api";
 
-                <div className="blueprint-sheet stagger-2">
-                    <div className="bp-header">
-                        <div>
-                            <p className="cad-label" style={{ marginBottom: "12px" }}>Contract Document #{selectedContract}</p>
-                            <h2 className="bp-title display">Landing page<br />redesign</h2>
-                            <div style={{ display: "flex", gap: "32px" }}>
-                                <div><span className="cad-label">Client</span><br /><span className="mono" style={{ fontWeight: 600 }}>GFRE…9K2L</span></div>
-                                <div><span className="cad-label">Freelancer</span><br /><span className="mono" style={{ fontWeight: 600 }}>GABC…WXYZ</span></div>
-                            </div>
-                        </div>
-                        <div className="escrow-lock">
-                            <p className="cad-label" style={{ color: "rgba(255,255,255,0.5)", marginBottom: "12px" }}>Escrow Locked</p>
-                            <p className="escrow-val">450</p>
-                            <p className="cad-label" style={{ color: "var(--brass)" }}>XLM</p>
-                        </div>
-                    </div>
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-                    <div className="structural-stack">
-                        {/* Milestone 1 */}
-                        <div className="stone-module stone-approved">
-                            <div className="stone-step">01</div>
-                            <div className="stone-content">
-                                <h3 className="display">Wireframes</h3>
-                                <p>Stage Complete — Funds Released</p>
-                            </div>
-                            <div className="stone-price">150 XLM</div>
-                        </div>
+function truncate(s: string) { return s ? `${s.slice(0, 6)}…${s.slice(-4)}` : "—"; }
 
-                        {/* Milestone 2 */}
-                        <div className="stone-module" style={{ background: "var(--alum)", border: "1px solid var(--grid-major)", borderLeft: "8px solid var(--banknote)" }}>
-                            <div className="stone-step" style={{ color: "var(--banknote)" }}>02</div>
-                            <div className="stone-content">
-                                <h3 className="display">Visual design</h3>
-                                <p style={{ color: "var(--banknote)" }}>Approved — Awaiting Distribution</p>
-                            </div>
-                            <div className="stone-price">200 XLM</div>
-                        </div>
+function getMilestoneStatus(ms: any): "approved" | "disputed" | "active" {
+    const s = String(ms?.status ?? "").toLowerCase();
+    if (s.includes("approve") || s.includes("release")) return "approved";
+    if (s.includes("dispute")) return "disputed";
+    return "active";
+}
 
-                        {/* Milestone 3 */}
-                        <div className="stone-module stone-disputed">
-                            <div className="stone-step">03</div>
-                            <div className="stone-content">
-                                <h3 className="display">Responsive build</h3>
-                                <p>Disputed by Client</p>
-                            </div>
-                            <div className="stone-price">100 XLM</div>
-                        </div>
-                    </div>
+// ── Per-Milestone Action Row ──────────────────────────────────────────────────
 
-                    <div className="action-bar">
-                        <button className="btn-arch btn-danger btn-outline">Raise Dispute</button>
-                        <button className="btn-arch">Approve Milestone</button>
-                    </div>
-                </div>
-            </main>
-        );
+function MilestoneActions({
+    jobId, milestoneIndex, status, role
+}: {
+    jobId: number;
+    milestoneIndex: number;
+    status: "approved" | "disputed" | "active";
+    role: "client" | "freelancer" | "observer";
+}) {
+    const [working, setWorking] = useState(false);
+    const [msg, setMsg] = useState("");
+    const { publicKey, network } = useWallet();
+
+    const passphrase = network === "TESTNET"
+        ? "Test SDF Network ; September 2015"
+        : "Public Global Stellar Network ; September 2015";
+
+    async function exec(fn: () => Promise<{ xdr: string }>, label: string) {
+        if (!publicKey) return;
+        setWorking(true);
+        setMsg(`Preparing ${label}…`);
+        try {
+            const { xdr } = await fn();
+            setMsg("Sign in Freighter…");
+            const { signedTxXdr } = await signTransaction(xdr, { networkPassphrase: passphrase, address: publicKey });
+            setMsg(`${label} submitted ✓`);
+            setTimeout(() => setMsg(""), 3000);
+            console.log("Signed XDR:", signedTxXdr);
+        } catch (e: any) {
+            setMsg(`Error: ${e.message ?? e}`);
+        } finally {
+            setWorking(false);
+        }
     }
 
-    // --- EXPLORER VIEW ---
+    if (status === "approved") return null; // approved stones show nothing
+
     return (
-        <main id="view-explorer" className="view active-view">
-            <div className="blueprint-sheet stagger-2">
-                <div className="bp-header" style={{ borderBottom: "1px solid var(--grid-main)", paddingBottom: "32px", marginBottom: "32px" }}>
-                    <div>
-                        <h2 className="bp-title display">Ledger Explorer</h2>
-                        <p className="cad-label text-iron/60" style={{ marginTop: "12px" }}>Navigate Global Escrow Architecture</p>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: "8px" }}>
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search Public Key or ID..."
-                            className="mono text-iron"
-                            style={{ background: "transparent", borderBottom: "2px solid var(--grid-major)", padding: "8px", outline: "none", width: "260px", fontSize: "13px" }}
-                        />
-                    </div>
-                </div>
+        <div className="stone-actions">
+            {msg && <span className="mono" style={{ fontSize: 11, opacity: 0.6, alignSelf: "center" }}>{msg}</span>}
 
-                <div className="structural-stack">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div
-                            key={i}
-                            className="stone-module explorer-row"
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => setSelectedContract(`${1024 + (page - 1) * 6 + i}`)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    setSelectedContract(`${1024 + (page - 1) * 6 + i}`);
-                                }
-                            }}
-                        >
-                            <div className="stone-step" style={{ color: "var(--brass)", fontWeight: 800 }}>#{(page - 1) * 6 + i + 1}</div>
-                            <div className="stone-content">
-                                <h3 className="display">Contract #{1024 + (page - 1) * 6 + i}</h3>
-                                <p className="mono" style={{ fontSize: "11px", marginTop: "4px" }}>Client: GFRE...9K2L</p>
-                            </div>
-                            <div className="stone-price" style={{ background: "var(--alum)", padding: "4px 12px", border: "1px solid var(--grid-major)", fontSize: "11px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
-                                <div className="dot-pulse"></div> Active
-                            </div>
+            {/* FREELANCER: submit work */}
+            {role === "freelancer" && status === "active" && (
+                <button
+                    disabled={working}
+                    className="stone-btn primary"
+                    onClick={() => exec(
+                        () => txSubmitMilestone(publicKey!, jobId, milestoneIndex),
+                        "Submit Milestone"
+                    )}
+                >
+                    Submit Work
+                </button>
+            )}
+
+            {/* CLIENT: approve or dispute */}
+            {role === "client" && status === "active" && (
+                <>
+                    <button
+                        disabled={working}
+                        className="stone-btn danger"
+                        onClick={() => exec(
+                            () => txRaiseDispute(publicKey!, jobId, milestoneIndex),
+                            "Raise Dispute"
+                        )}
+                    >
+                        Raise Dispute
+                    </button>
+                    <button
+                        disabled={working}
+                        className="stone-btn primary"
+                        onClick={() => exec(
+                            () => txApproveMilestone(publicKey!, jobId, milestoneIndex),
+                            "Approve Milestone"
+                        )}
+                    >
+                        Approve &amp; Release
+                    </button>
+                </>
+            )}
+        </div>
+    );
+}
+
+// ── Detail View ───────────────────────────────────────────────────────────────
+
+function DetailView({
+    jobId,
+    meta,
+    onBack
+}: {
+    jobId: number;
+    meta: JobMetadataPayload | null;
+    onBack: () => void;
+}) {
+    const { publicKey } = useWallet();
+    const [chain, setChain] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let active = true;
+        if (!publicKey) { setLoading(false); return; }
+        fetchJobData(jobId, publicKey).then(d => { if (active) { setChain(d); setLoading(false); } }).catch(() => setLoading(false));
+        return () => { active = false; };
+    }, [jobId, publicKey]);
+
+    const role =
+        chain?.client === publicKey ? "client" :
+            chain?.freelancer === publicKey ? "freelancer" : "observer";
+
+    const milestones = meta?.milestones ?? [];
+    const totalXlm = milestones.reduce((s: number, m: any) => s + Number(m.amount ?? 0), 0);
+
+    return (
+        <div id="view-detail" className="page-view active">
+            <button className="btn-back" onClick={onBack}>← Back to Explorer</button>
+
+            {/* Header */}
+            <div className="blueprint-header">
+                <div className="blueprint-title-block">
+                    <h2 className="display">
+                        {meta?.title ?? `Contract ${String(jobId).padStart(3, "0")}`}
+                    </h2>
+                    <div className="parties-grid">
+                        <div>
+                            <p className="party-label">Client</p>
+                            <p className="party-hash mono">{truncate(chain?.client ?? meta?.clientAddress ?? "")}</p>
                         </div>
-                    ))}
+                        <div>
+                            <p className="party-label">Freelancer</p>
+                            <p className="party-hash mono">{truncate(chain?.freelancer ?? meta?.freelancerAddress ?? "")}</p>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="action-bar" style={{ justifyContent: "space-between", marginTop: "48px", borderTop: "none", background: "transparent" }}>
-                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="btn-arch btn-outline" style={{ padding: "8px 24px", borderColor: "var(--grid-major)", color: page === 1 ? "var(--oxide)" : "var(--iron)" }}>&larr; Prev</button>
-                    <span className="mono" style={{ alignSelf: "center", fontSize: "12px", fontWeight: 600 }}>Page {page} of 140</span>
-                    <button onClick={() => setPage(p => p + 1)} className="btn-arch btn-outline" style={{ padding: "8px 24px", borderColor: "var(--grid-major)", color: "var(--iron)" }}>Next &rarr;</button>
+                <div className="escrow-total">
+                    <p className="party-label" style={{ textAlign: "right" }}>Total Escrow</p>
+                    <p className="escrow-amount display">{totalXlm > 0 ? totalXlm : "—"}</p>
+                    <p className="escrow-label">XLM</p>
                 </div>
             </div>
-        </main>
+
+            {/* Milestones timeline */}
+            {loading && <p className="uppercase" style={{ color: "rgba(22,26,29,0.4)", padding: "40px 0" }}>Loading contract state…</p>}
+
+            {!loading && (
+                <div className="structural-timeline">
+                    {milestones.length === 0 && (
+                        <div className="stone-block">
+                            <div className="stone-info">
+                                <div className="stone-meta">
+                                    <h3>No milestones recorded</h3>
+                                    <p>On-chain data only</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {milestones.map((ms: any, i: number) => {
+                        const chainMs = chain?.milestones?.[i];
+                        const status = getMilestoneStatus(chainMs);
+                        const blockClass = `stone-block${status === "approved" ? " stone-approved" : status === "disputed" ? " stone-disputed" : ""}`;
+
+                        return (
+                            <div key={i} className={blockClass}>
+                                <div className="stone-info">
+                                    <div className="stone-meta">
+                                        <h3 className="display">{ms.title}</h3>
+                                        <p>
+                                            {status === "approved" && "Stage Complete — Funds Released"}
+                                            {status === "disputed" && "Milestone Disputed"}
+                                            {status === "active" && "In Progress"}
+                                        </p>
+                                    </div>
+                                    <div className="stone-value mono">
+                                        {ms.amount ?? "—"} XLM
+                                    </div>
+                                </div>
+
+                                <MilestoneActions
+                                    jobId={jobId}
+                                    milestoneIndex={i}
+                                    status={status}
+                                    role={role}
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Explorer (List) View ──────────────────────────────────────────────────────
+
+function ExplorerView({ onSelect }: { onSelect: (id: number, meta: JobMetadataPayload) => void }) {
+    const { publicKey } = useWallet();
+    const [search, setSearch] = useState("");
+    const [jobs, setJobs] = useState<JobMetadataPayload[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const load = useCallback(async (q: string) => {
+        setLoading(true);
+        try {
+            const params: { search?: string; wallet?: string } = {};
+            if (q) params.search = q;
+            const data = await fetchJobMetadata(params);
+            setJobs(Array.isArray(data) ? data : (data.jobs ?? []));
+        } catch {
+            setJobs([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Debounce search
+    useEffect(() => {
+        const t = setTimeout(() => load(search), 350);
+        return () => clearTimeout(t);
+    }, [search, load]);
+
+    return (
+        <div id="view-explorer" className="page-view active">
+            <div className="blueprint-explorer-header">
+                <div>
+                    <h2 className="display" style={{ fontSize: "clamp(2rem, 4vw, 3.5rem)", fontWeight: 800, letterSpacing: "-0.04em" }}>
+                        Explorer
+                    </h2>
+                    <p style={{ color: "rgba(22,26,29,0.5)", marginTop: 8, fontSize: 15 }}>
+                        Browse and inspect all escrow contracts on-chain
+                    </p>
+                </div>
+                <input
+                    className="explorer-search mono"
+                    type="text"
+                    placeholder="Search by title, address, or ID…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                />
+            </div>
+
+            <div className="contract-list-view">
+                {loading && (
+                    <p className="uppercase" style={{ color: "rgba(22,26,29,0.4)", padding: "40px 0" }}>
+                        Fetching contracts…
+                    </p>
+                )}
+
+                {!loading && jobs.length === 0 && (
+                    <div className="contract-module" style={{ opacity: 0.4, pointerEvents: "none" }}>
+                        <div><p className="c-title">No contracts found</p></div>
+                    </div>
+                )}
+
+                {jobs.map((job) => (
+                    <div
+                        key={job.jobId}
+                        className="contract-module"
+                        onClick={() => onSelect(job.jobId, job)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={e => e.key === "Enter" && onSelect(job.jobId, job)}
+                    >
+                        <div>
+                            <p className="c-title display">
+                                {job.title || `Contract ${String(job.jobId).padStart(3, "0")}`}
+                            </p>
+                            <p className="c-meta mono">
+                                {truncate(job.clientAddress)} · {job.milestones.length} milestone{job.milestones.length !== 1 ? "s" : ""}
+                            </p>
+                        </div>
+                        <div className="c-status">
+                            <div className="status-ring ring-active">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                                </svg>
+                            </div>
+                            <span className="uppercase" style={{ color: "var(--banknote)" }}>Active</span>
+                        </div>
+                        <div className="c-value mono">
+                            {job.milestones.reduce((s: number, m: any) => s + Number(m.amount ?? 0), 0) || "—"} XLM
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                            <span style={{ fontSize: 24, opacity: 0.3 }}>→</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ── Root ──────────────────────────────────────────────────────────────────────
+
+export default function BlueprintView({
+    setView,
+    initialJobId
+}: {
+    setView?: (v: string) => void;
+    initialJobId?: number;
+}) {
+    const [selected, setSelected] = useState<{ id: number; meta: JobMetadataPayload } | null>(
+        initialJobId !== undefined ? { id: initialJobId, meta: null as any } : null
+    );
+
+    return selected ? (
+        <DetailView
+            jobId={selected.id}
+            meta={selected.meta}
+            onBack={() => setSelected(null)}
+        />
+    ) : (
+        <ExplorerView
+            onSelect={(id, meta) => setSelected({ id, meta })}
+        />
     );
 }

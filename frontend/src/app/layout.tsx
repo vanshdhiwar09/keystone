@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "../context/WalletContext";
+import { TransactionProvider } from "../context/TransactionContext";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -16,7 +17,7 @@ const dmSans = DM_Sans({
 });
 
 const dmMono = DM_Mono({
-  weight: ["400", "500", "500"],
+  weight: ["400", "500"],
   subsets: ["latin"],
   variable: "--font-mono",
   display: "swap",
@@ -33,19 +34,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}>
+    <html lang="en" className={`${bricolage.variable} ${dmSans.variable} ${dmMono.variable}`}>
       <body>
         <WalletProvider>
-          {/* Architectural Blueprint Background Setup */}
-          <div className="environment">
-            <div className="blueprint-grid"></div>
-            <div className="ambient-light"></div>
-            <div className="tactile-noise"></div>
-          </div>
-
-          <div className="app-frame" id="main-app">
-            {children}
-          </div>
+          <TransactionProvider>
+            <div className="layout-wrapper">
+              {children}
+            </div>
+          </TransactionProvider>
         </WalletProvider>
       </body>
     </html>

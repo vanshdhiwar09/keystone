@@ -2,7 +2,8 @@
 
 import { useWallet } from "../../context/WalletContext";
 
-export default function VaultView() {
+export default function VaultView({ setView }: { setView?: (v: string) => void }) {
+
     const { installed, network, publicKey, connect } = useWallet();
 
     const truncate = (str: string) => `${str.slice(0, 4)}…${str.slice(-4)}`;

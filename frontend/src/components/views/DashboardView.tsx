@@ -4,8 +4,39 @@ import { useEffect, useState } from "react";
 import { useWallet } from "../../context/WalletContext";
 import { fetchJobData } from "../../lib/soroban";
 
+// ── Status Ring Icons — copied verbatim from reference ────────────────────────
+
+function RingActive() {
+    return (
+        <div className="status-ring ring-active">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+        </div>
+    );
+}
+
+function RingDispute() {
+    return (
+        <div className="status-ring ring-dispute">
+            <span style={{ fontWeight: 800, fontFamily: "sans-serif" }}>!</span>
+        </div>
+    );
+}
+
+function RingDone() {
+    return (
+        <div className="status-ring ring-done">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <polyline points="20 6 9 17 4 12" />
+            </svg>
+        </div>
+    );
+}
+
+// ── Hero Arch SVG — animated masonry arch ─────────────────────────────────────
+
 function HeroArch() {
-    // ... Original HeroArch retained precisely
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setTimeout(() => setMounted(true), 50); }, []);
 
@@ -21,48 +52,76 @@ function HeroArch() {
         const x3 = cx + r2 * Math.cos(rad1), y3 = cy - r2 * Math.sin(rad1);
         const x4 = cx + r1 * Math.cos(rad1), y4 = cy - r1 * Math.sin(rad1);
         const isKeystone = i === Math.floor(stones / 2);
-
         const d = `M${x1},${y1} L${x2},${y2} L${x3},${y3} L${x4},${y4} Z`;
         const delay = isKeystone ? 1000 : (i < 4 ? i * 150 : (8 - i) * 150);
 
         const style = mounted ? {
-            opacity: 1, transform: 'translateY(0)', stroke: isKeystone ? 'var(--brass)' : 'var(--iron)',
-            fill: isKeystone ? 'var(--brass)' : 'var(--alum)', filter: isKeystone ? 'drop-shadow(0 0 24px rgba(191,161,95,0.8))' : 'none',
-            strokeWidth: '1.5px', strokeDasharray: 400, strokeDashoffset: 0, transition: `all 0.8s cubic-bezier(0.85, 0, 0.15, 1) ${delay}ms`
+            opacity: 1, transform: "translateY(0)",
+            stroke: isKeystone ? "var(--brass)" : "var(--iron)",
+            fill: isKeystone ? "var(--brass)" : "var(--alum)",
+            filter: isKeystone ? "drop-shadow(0 0 24px rgba(191,161,95,0.8))" : "none",
+            strokeWidth: "1.5px", strokeDasharray: 400, strokeDashoffset: 0,
+            transition: `all 0.8s cubic-bezier(0.85, 0, 0.15, 1) ${delay}ms`
         } : {
-            opacity: isKeystone ? 0 : 1, transform: isKeystone ? 'translateY(-40px)' : 'translateY(0)',
-            fill: 'transparent', stroke: 'var(--iron)', strokeWidth: '1.5px', strokeDasharray: 400, strokeDashoffset: 400,
-            filter: 'none', transition: `all 0.8s cubic-bezier(0.85, 0, 0.15, 1)`
+            opacity: isKeystone ? 0 : 1,
+            transform: isKeystone ? "translateY(-40px)" : "translateY(0)",
+            fill: "transparent", stroke: "var(--iron)", strokeWidth: "1.5px",
+            strokeDasharray: 400, strokeDashoffset: 400,
+            filter: "none", transition: "all 0.8s cubic-bezier(0.85, 0, 0.15, 1)"
         };
 
         return <path key={i} d={d} style={style} />;
     });
 
     return (
-        <svg className="dynamic-arch" viewBox="0 0 400 300" fill="none">
+        <svg viewBox="0 0 400 300" fill="none" style={{ width: "100%", maxWidth: 600, overflow: "visible", filter: "drop-shadow(0 24px 48px rgba(191,161,95,0.15))" }}>
             <path d="M20,250 L380,250" stroke="var(--grid-major)" strokeWidth="2" />
             {paths}
         </svg>
     );
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function truncate(str: string) { return `${str.slice(0, 4)}…${str.slice(-4)}`; }
+
+function getJobStatus(job: any): "active" | "disputed" | "done" {
+    const raw = job.data?.status;
+    const s = Array.isArray(raw) ? raw[0] : raw;
+    if (!s) return "active";
+    const str = typeof s === "string" ? s.toLowerCase() : "";
+    if (str.includes("dispute")) return "disputed";
+    if (str.includes("complete") || str.includes("release") || str.includes("refund")) return "done";
+    return "active";
+}
+
+function getStatusLabel(status: "active" | "disputed" | "done"): string {
+    if (status === "disputed") return "Disputed";
+    if (status === "done") return "Complete";
+    return "In Progress";
+}
+
+function getStatusColor(status: "active" | "disputed" | "done"): string {
+    if (status === "disputed") return "var(--oxide)";
+    if (status === "done") return "var(--iron)";
+    return "var(--banknote)";
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
 export default function DashboardView({ setView }: { setView: (v: string) => void }) {
     const { publicKey } = useWallet();
     const [jobs, setJobs] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [tvl, setTvl] = useState(0);
+    const [tvl] = useState(0); // Placeholder — requires milestone-level stroops parsing
 
-    const truncate = (str: string) => `${str.slice(0, 4)}…${str.slice(-4)}`;
-
-    // Existing "hardcoded scan" logic rewritten gracefully restoring Day 11 logic
+    // ── Wallet-filtered job scan (preserved exactly from recovery) ────────────
     useEffect(() => {
         let active = true;
         async function fetchJobs() {
             if (!publicKey) return;
             setLoading(true);
             const found: any[] = [];
-            let cumulativeXlm = 0;
-
 
             for (let i = 1; i <= 5; i++) {
                 try {
@@ -71,12 +130,11 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                         found.push({ id: i, data: val });
                     }
                 } catch {
-                    // Job doesn't exist at this ID, continue scanning
+                    // Job doesn't exist at this ID — continue scanning
                 }
             }
             if (active) {
                 setJobs(found);
-                setTvl(cumulativeXlm);
                 setLoading(false);
             }
         }
@@ -85,71 +143,118 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
     }, [publicKey]);
 
     return (
-        <main className="page-view active animate-[fade-in_400ms_ease-out]" id="view-dashboard">
-            <div className="hero-grid-layout">
-                <div className="hero-statement stagger-2">
-                    <p className="cad-label" style={{ marginBottom: "16px" }}>System Protocol v2.4</p>
-                    <h2 className="display">Work locks in.<br /><em>Trust</em> holds it.</h2>
-                    <p className="hero-sub">Cryptographically secure escrow without intermediaries. Funds remain locked structurally until milestones are mathematically proven.</p>
-                </div>
+        <main className="page-view active" id="view-dashboard">
+            {/* ── Dashboard Grid — 2-column reference layout ── */}
+            <div className="dashboard-grid">
 
-                <div className="arch-theater stagger-3" id="hero-arch">
-                    <HeroArch />
-                </div>
-            </div>
+                {/* Left: Hero Statement */}
+                <div className="hero-statement">
+                    <h2 className="display">
+                        Work locks in.<br />
+                        Trust <em>holds it together.</em>
+                    </h2>
+                    <p>
+                        Funds remain cryptographically locked in escrow until milestones are mutually approved.
+                        No invoicing, no chasing, no intermediaries.
+                    </p>
 
-            <div className="data-girder stagger-4">
-                <div className="data-block">
-                    <span className="cad-label">Total Volume Locked</span>
-                    <span className="data-value mono">{tvl} XLM</span>
-                </div>
-                <div className="data-block" style={{ paddingLeft: "40px" }}>
-                    <span className="cad-label">Active Contracts</span>
-                    <span className="data-value mono">{jobs.length}.00</span>
-                </div>
-                <div className="data-block" style={{ paddingLeft: "40px" }}>
-                    <span className="cad-label">Distribution Rate</span>
-                    <span className="data-value mono">100%</span>
-                </div>
-            </div>
-
-            <div className="stagger-4" style={{ animationDelay: "0.5s", marginTop: "60px" }}>
-                <div className="blueprint-header" style={{ marginBottom: "40px" }}>
-                    <h3 className="section-title display">Active Architecture</h3>
-                    <button className="btn-massive" style={{ padding: "12px 24px", minWidth: "200px" }} onClick={() => setView('create')}>Initialize Contract</button>
-                </div>
-
-                {loading && <p className="cad-label text-center pt-8">Scanning Cryptographic Architecture...</p>}
-
-                {jobs.map(job => {
-                    const statusStr = job.data.status ? (Array.isArray(job.data.status) ? job.data.status[0] : job.data.status) : "Active";
-
-                    return (
-                        <div key={job.id} className="contract-module" onClick={() => setView('blueprint')} role="button" tabIndex={0}>
-                            <div>
-                                <p className="c-title display">Contract {job.id.toString().padStart(3, '0')}</p>
-                                <p className="c-meta mono">Client: {truncate(job.data.client)}</p>
-                            </div>
-                            <div className="c-status">
-                                <span className="status-dot" style={{ background: statusStr === 'Disputed' ? 'var(--oxide)' : 'var(--brass)' }}></span>
-                                <span style={{ fontFamily: '"DM Sans", sans-serif', fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                    {statusStr}
-                                </span>
-                            </div>
-                            <div className="c-meta mono">{job.data.milestone_count || 0} Milestones</div>
-                            <div className="c-value mono">*** XLM</div>
-                        </div>
-                    );
-                })}
-
-                {!loading && jobs.length === 0 && (
-                    <div className="contract-module" style={{ opacity: 0.5, pointerEvents: "none" }}>
+                    {/* Stats row — reference design */}
+                    <div style={{ display: "flex", gap: 40, marginTop: 60 }}>
                         <div>
-                            <p className="c-title display">No Active Contracts</p>
-                            <p className="c-meta">Awaiting Deployments</p>
+                            <p className="mono" style={{ fontSize: 32, fontWeight: 600, color: "var(--iron)" }}>
+                                {jobs.length > 0 ? `${jobs.length}` : "—"}
+                            </p>
+                            <p className="uppercase" style={{ color: "rgba(22,26,29,0.5)" }}>
+                                {jobs.length === 1 ? "Contract Active" : "Contracts Active"}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="mono" style={{ fontSize: 32, fontWeight: 600, color: "var(--iron)" }}>100%</p>
+                            <p className="uppercase" style={{ color: "rgba(22,26,29,0.5)" }}>Release Rate</p>
                         </div>
                     </div>
-                )}
+                </div>
+
+                {/* Right: Animated Arch */}
+                <div className="arch-container" id="hero-arch-container">
+                    <HeroArch />
+                </div>
+
+                {/* Bottom: Active Contracts — spans full width */}
+                <div className="contracts-section">
+                    <div className="section-header">
+                        <h3 className="display section-title">Active Contracts</h3>
+                        <button
+                            className="stone-btn primary"
+                            style={{ padding: "12px 24px", borderRadius: 4, fontSize: 12 }}
+                            onClick={() => setView("create")}
+                        >
+                            New Contract
+                        </button>
+                    </div>
+
+                    <div>
+                        {loading && (
+                            <p className="uppercase" style={{ color: "rgba(22,26,29,0.4)", padding: "40px 0" }}>
+                                Scanning architecture…
+                            </p>
+                        )}
+
+                        {!loading && jobs.length === 0 && (
+                            <div className="contract-module" style={{ opacity: 0.4, pointerEvents: "none" }}>
+                                <div>
+                                    <p className="c-title display">No Active Contracts</p>
+                                    <p className="c-meta mono">Deploy your first escrow to get started</p>
+                                </div>
+                                <div className="c-status">
+                                    <RingDone />
+                                    <span className="uppercase" style={{ color: "rgba(22,26,29,0.4)" }}>Awaiting</span>
+                                </div>
+                                <div className="c-value mono">0 XLM</div>
+                                <div style={{ textAlign: "right" }}>
+                                    <span style={{ fontSize: 24, opacity: 0.2 }}>→</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {jobs.map(job => {
+                            const status = getJobStatus(job);
+                            const label = getStatusLabel(status);
+                            const color = getStatusColor(status);
+                            // Determine role label based on connected wallet
+                            const roleLabel = job.data.client === publicKey ? "Client" : "Freelancer";
+                            const counterparty = job.data.client === publicKey
+                                ? truncate(job.data.freelancer || "")
+                                : truncate(job.data.client || "");
+
+                            return (
+                                <div
+                                    key={job.id}
+                                    className="contract-module"
+                                    onClick={() => setView(`blueprint:${job.id}`)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={e => e.key === "Enter" && setView(`blueprint:${job.id}`)}
+                                >
+                                    <div>
+                                        <p className="c-title display">Contract {job.id.toString().padStart(3, "0")}</p>
+                                        <p className="c-meta mono">{roleLabel} · {counterparty}</p>
+                                    </div>
+                                    <div className="c-status">
+                                        {status === "active" && <RingActive />}
+                                        {status === "disputed" && <RingDispute />}
+                                        {status === "done" && <RingDone />}
+                                        <span className="uppercase" style={{ color }}>{label}</span>
+                                    </div>
+                                    <div className="c-value mono">{tvl > 0 ? `${tvl} XLM` : "— XLM"}</div>
+                                    <div style={{ textAlign: "right" }}>
+                                        <span style={{ fontSize: 24, opacity: 0.3 }}>→</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         </main>
     );

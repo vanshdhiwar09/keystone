@@ -13,17 +13,26 @@ import ActivityView from "../components/views/ActivityView";
 export default function Home() {
   const [activeView, setActiveView] = useState("dashboard");
 
+  // Parse job ID from "blueprint:42" style navigation from DashboardView
+  const isBlueprintView = activeView === "blueprint" || activeView.startsWith("blueprint:");
+  const blueprintJobId = activeView.startsWith("blueprint:")
+    ? parseInt(activeView.split(":")[1], 10)
+    : undefined;
+
+  // Normalised view name for NavigationDock (strip the :id suffix)
+  const dockView = activeView.includes(":") ? activeView.split(":")[0] : activeView;
+
   return (
     <>
       <Header />
 
       {activeView === "dashboard" && <DashboardView setView={setActiveView} />}
-      {activeView === "blueprint" && <BlueprintView />}
-      {activeView === "vault" && <VaultView />}
+      {isBlueprintView && <BlueprintView setView={setActiveView} initialJobId={blueprintJobId} />}
+      {(activeView === "vault" || activeView === "create") && <VaultView setView={setActiveView} />}
       {activeView === "tx" && <TerminalView />}
       {activeView === "feed" && <ActivityView />}
 
-      <NavigationDock activeView={activeView} setActiveView={setActiveView} />
+      <NavigationDock activeView={dockView} setActiveView={setActiveView} />
     </>
   );
 }
