@@ -1,37 +1,51 @@
 "use client";
 
 import { useWallet } from "../../context/WalletContext";
+import CreateJobFlow from "../CreateJobFlow";
 
 export default function VaultView({ setView }: { setView?: (v: string) => void }) {
+    const { installed, publicKey, connect } = useWallet();
 
-    const { installed, network, publicKey, connect } = useWallet();
-
-    const truncate = (str: string) => `${str.slice(0, 4)}…${str.slice(-4)}`;
-
-    return (
-        <main id="view-wallet" className="view active-view">
-            <div className="vault-chamber stagger-2">
-                <div className="vault-mechanism" id="vault-ui">
-                    <div className="v-ring-outer"></div>
-                    <div className="v-ring-inner" id="v-ring"></div>
-
-                    <h2 className="v-status display" id="v-title">
-                        {publicKey ? "Connected" : installed === false ? "Missing" : installed === "error" ? "Fault" : "Locked"}
+    // If not connected, show the connect prompt
+    if (!publicKey) {
+        return (
+            <main className="page-view active" id="view-create">
+                <div style={{ maxWidth: 600, margin: "0 auto", padding: "80px 0", textAlign: "center" }}>
+                    <h2 className="display" style={{ fontSize: "clamp(1.8rem, 3vw, 2.5rem)", marginBottom: 16 }}>
+                        New Contract
                     </h2>
-                    <p className="v-hash" id="v-sub">
-                        {publicKey ? truncate(publicKey) : installed === false ? "No Freighter Extension" : "Awaiting Explorer Signature"}
+                    <p style={{ color: "rgba(22,26,29,0.5)", marginBottom: 40 }}>
+                        Connect your Freighter wallet to deploy a new escrow contract.
                     </p>
-                </div>
 
-                <div className="vault-controls stagger-3">
-                    {!publicKey && (
-                        <button className="btn-arch btn-outline" onClick={connect}>Connect Freighter</button>
-                    )}
-                    {network && network !== "TESTNET" && (
-                        <button className="btn-arch btn-outline btn-danger">Switch to Testnet</button>
+                    {installed === false ? (
+                        <a
+                            href="https://www.freighter.app/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="stone-btn primary"
+                            style={{ padding: "14px 32px", borderRadius: 4, fontSize: 13, textDecoration: "none", display: "inline-block" }}
+                        >
+                            Install Freighter
+                        </a>
+                    ) : (
+                        <button
+                            className="stone-btn primary"
+                            style={{ padding: "14px 32px", borderRadius: 4, fontSize: 13 }}
+                            onClick={connect}
+                        >
+                            Connect Wallet
+                        </button>
                     )}
                 </div>
-            </div>
+            </main>
+        );
+    }
+
+    // Wallet connected — show the full CreateJobFlow
+    return (
+        <main className="page-view active" id="view-create" style={{ paddingBottom: 120 }}>
+            <CreateJobFlow setView={setView} />
         </main>
     );
 }

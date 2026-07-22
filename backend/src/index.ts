@@ -128,7 +128,8 @@ app.post("/api/jobs", async (req, res) => {
                 job_id: jobId,
                 milestone_index: index + 1,
                 title: m.title,
-                description: m.description
+                description: m.description,
+                amount: m.amount || 0
             }));
 
             const { error: msErr } = await supabase.from("milestones").insert(milestoneInserts);
@@ -150,8 +151,13 @@ app.get("/api/jobs", async (req, res) => {
         let query = supabase
             .from("jobs")
             .select(`
-                job_id, title, description, client_address, freelancer_address, created_at,
-                milestones ( id, milestone_index, title, description )
+                jobId:job_id,
+                title,
+                description,
+                clientAddress:client_address,
+                freelancerAddress:freelancer_address,
+                createdAt:created_at,
+                milestones ( id, milestoneIndex:milestone_index, title, description, amount )
             `)
             .order('created_at', { ascending: false });
 

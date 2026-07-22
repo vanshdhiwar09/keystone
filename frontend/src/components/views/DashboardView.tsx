@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useWallet } from "../../context/WalletContext";
-import { fetchJobMetadata, JobMetadataPayload } from "../../lib/api";
 import { fetchJobData } from "../../lib/soroban";
 
 // ── Status Ring Icons — copied verbatim from reference ────────────────────────
@@ -115,33 +114,27 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
     const [jobs, setJobs] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
+    // On-chain polling — scan job IDs 1..20 and filter by wallet
     useEffect(() => {
         let active = true;
         async function fetchJobs() {
             if (!publicKey) return;
             setLoading(true);
-            try {
-                // 1. Fetch metadata (which has the milestones list for TVL)
-                const meta = await fetchJobMetadata({ wallet: publicKey });
-                const metaArr = Array.isArray(meta) ? meta : (meta.jobs ?? []);
+            const found: any[] = [];
 
-                // 2. Fetch real on-chain state (for accurate active/dispute/done status rings)
-                const combined = await Promise.all(metaArr.map(async (m: any) => {
-                    try {
-                        const onChain = await fetchJobData(m.jobId, publicKey);
-                        return { ...m, data: onChain };
-                    } catch {
-                        return { ...m, data: null };
+            for (let i = 1; i <= 20; i++) {
+                try {
+                    const val = await fetchJobData(i, publicKey);
+                    if (val && (val.client === publicKey || val.freelancer === publicKey)) {
+                        found.push({ id: i, data: val });
                     }
-                }));
-
-                if (active) {
-                    setJobs(combined);
+                } catch {
+                    // Job doesn't exist at this ID — continue scanning
                 }
-            } catch (e) {
-                console.error(e);
-            } finally {
-                if (active) setLoading(false);
+            }
+            if (active) {
+                setJobs(found);
+                setLoading(false);
             }
         }
         fetchJobs();
@@ -202,7 +195,7 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                     <div>
                         {loading && (
                             <p className="uppercase" style={{ color: "rgba(22,26,29,0.4)", padding: "40px 0" }}>
-                                Scanning architecture…
+                                Scanning on-chain contracts…
                             </p>
                         )}
 
@@ -223,35 +216,39 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                             </div>
                         )}
 
-                        {jobs.map((job: JobMetadataPayload) => {
-                            // Determine role label based on connected wallet
-                            const roleLabel = job.clientAddress === publicKey ? "Client" : "Freelancer";
-                            const counterparty = job.clientAddress === publicKey
-                                ? truncate(job.freelancerAddress || "")
-                                : truncate(job.clientAddress || "");
+                        {jobs.map(job => {
+                            const status = getJobStatus(job);
+                            const label = getStatusLabel(status);
+                            const color = getStatusColor(status);
+                            const roleLabel = job.data.client === publicKey ? "Client" : "Freelancer";
+                            const counterparty = job.data.client === publicKey
+                                ? truncate(job.data.freelancer || "")
+                                : truncate(job.data.client || "");
 
-                            const tvl = Array.isArray(job.milestones)
-                                ? job.milestones.reduce((s: number, m: any) => s + Number(m.amount ?? 0), 0)
-                                : 0;
+                            // Calculate TVL from on-chain amount (in stroops → XLM)
+                            const amountStroops = Number(job.data.amount ?? 0);
+                            const tvl = amountStroops > 0 ? (amountStroops / 10000000).toFixed(1) : "—";
 
                             return (
                                 <div
-                                    key={job.jobId}
+                                    key={job.id}
                                     className="contract-module"
-                                    onClick={() => setView(`blueprint:${job.jobId}`)}
+                                    onClick={() => setView(`blueprint:${job.id}`)}
                                     role="button"
                                     tabIndex={0}
-                                    onKeyDown={e => e.key === "Enter" && setView(`blueprint:${job.jobId}`)}
+                                    onKeyDown={e => e.key === "Enter" && setView(`blueprint:${job.id}`)}
                                 >
                                     <div>
-                                        <p className="c-title display">{job.title || `Contract ${job.jobId.toString().padStart(3, "0")}`}</p>
+                                        <p className="c-title display">Contract {job.id.toString().padStart(3, "0")}</p>
                                         <p className="c-meta mono">{roleLabel} · {counterparty}</p>
                                     </div>
                                     <div className="c-status">
-                                        <RingActive />
-                                        <span className="uppercase" style={{ color: "var(--banknote)" }}>In Progress</span>
+                                        {status === "active" && <RingActive />}
+                                        {status === "disputed" && <RingDispute />}
+                                        {status === "done" && <RingDone />}
+                                        <span className="uppercase" style={{ color }}>{label}</span>
                                     </div>
-                                    <div className="c-value mono">{tvl > 0 ? `${tvl} XLM` : "— XLM"}</div>
+                                    <div className="c-value mono">{tvl} XLM</div>
                                     <div style={{ textAlign: "right" }}>
                                         <span style={{ fontSize: 24, opacity: 0.3 }}>→</span>
                                     </div>
