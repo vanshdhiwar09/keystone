@@ -113,7 +113,6 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
     const { publicKey } = useWallet();
     const [jobs, setJobs] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [tvl] = useState(0); // Placeholder — requires milestone-level stroops parsing
 
     // ── Wallet-filtered job scan (preserved exactly from recovery) ────────────
     useEffect(() => {
@@ -226,6 +225,10 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                             const counterparty = job.data.client === publicKey
                                 ? truncate(job.data.freelancer || "")
                                 : truncate(job.data.client || "");
+
+                            const tvl = Array.isArray(job.data.milestones)
+                                ? job.data.milestones.reduce((s: number, m: any) => s + Number(m.amount ?? 0), 0)
+                                : 0;
 
                             return (
                                 <div

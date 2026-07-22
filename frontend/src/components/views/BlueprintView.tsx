@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useWallet } from "../../context/WalletContext";
-import { fetchJobData, txSubmitMilestone, txApproveMilestone, txRaiseDispute } from "../../lib/soroban";
+import { fetchJobData, txSubmitMilestone, txApproveMilestone, txRaiseDispute, txDistributeMilestone, txResolveDispute, pollTx, server } from "../../lib/soroban";
+import { TransactionBuilder } from "@stellar/stellar-sdk";
 
 import { fetchJobMetadata, JobMetadataPayload } from "../../lib/api";
 import { signTransaction } from "@stellar/freighter-api";
@@ -26,7 +27,7 @@ function MilestoneActions({
     jobId: number;
     milestoneIndex: number;
     status: "approved" | "disputed" | "active";
-    role: "client" | "freelancer" | "observer";
+    role: "client" | "freelancer" | "observer" | "arbiter";
 }) {
     const [working, setWorking] = useState(false);
     const [msg, setMsg] = useState("");
@@ -45,9 +46,21 @@ function MilestoneActions({
             setMsg("Sign in Freighter…");
             const xdrStr = typeof tx === "string" ? tx : tx.toXDR();
             const { signedTxXdr } = await signTransaction(xdrStr, { networkPassphrase: passphrase, address: publicKey });
-            setMsg(`${label} submitted ✓`);
+
+            setMsg("Broadcasting to network…");
+            const submitTx = await server.sendTransaction(
+                TransactionBuilder.fromXDR(signedTxXdr, passphrase) as any
+            );
+
+            if (submitTx.status !== "PENDING") {
+                throw new Error(`Submission failed: ${submitTx.status}`);
+            }
+
+            setMsg("Confirming on ledger…");
+            await pollTx(submitTx.hash);
+
+            setMsg(`${label} success ✓`);
             setTimeout(() => setMsg(""), 3000);
-            console.log("Signed XDR:", signedTxXdr);
         } catch (e: any) {
             setMsg(`Error: ${e.message ?? e}`);
         } finally {
@@ -55,13 +68,11 @@ function MilestoneActions({
         }
     }
 
-    if (status === "approved") return null; // approved stones show nothing
-
     return (
         <div className="stone-actions">
-            {msg && <span className="mono" style={{ fontSize: 11, opacity: 0.6, alignSelf: "center" }}>{msg}</span>}
+            {msg && <span className="mono" style={{ fontSize: 11, opacity: 0.6, alignSelf: "center", marginRight: "auto" }}>{msg}</span>}
 
-            {/* FREELANCER: submit work */}
+            {/* FREELANCER: submit active work OR distribute approved funds */}
             {role === "freelancer" && status === "active" && (
                 <button
                     disabled={working}
@@ -75,7 +86,20 @@ function MilestoneActions({
                 </button>
             )}
 
-            {/* CLIENT: approve or dispute */}
+            {role === "freelancer" && status === "approved" && (
+                <button
+                    disabled={working}
+                    className="stone-btn primary"
+                    onClick={() => exec(
+                        () => txDistributeMilestone(publicKey!, jobId, milestoneIndex),
+                        "Distribute Funds"
+                    )}
+                >
+                    Distribute Funds
+                </button>
+            )}
+
+            {/* CLIENT: approve or dispute active work */}
             {role === "client" && status === "active" && (
                 <>
                     <button
@@ -97,6 +121,32 @@ function MilestoneActions({
                         )}
                     >
                         Approve &amp; Release
+                    </button>
+                </>
+            )}
+
+            {/* ARBITER: resolve disputed work */}
+            {role === "arbiter" && status === "disputed" && (
+                <>
+                    <button
+                        disabled={working}
+                        className="stone-btn danger"
+                        onClick={() => exec(
+                            () => txResolveDispute(publicKey!, jobId, milestoneIndex, false),
+                            "Refund Client"
+                        )}
+                    >
+                        Refund Client
+                    </button>
+                    <button
+                        disabled={working}
+                        className="stone-btn primary"
+                        onClick={() => exec(
+                            () => txResolveDispute(publicKey!, jobId, milestoneIndex, true),
+                            "Release to Freelancer"
+                        )}
+                    >
+                        Release to Freelancer
                     </button>
                 </>
             )}
@@ -128,7 +178,8 @@ function DetailView({
 
     const role =
         chain?.client === publicKey ? "client" :
-            chain?.freelancer === publicKey ? "freelancer" : "observer";
+            chain?.freelancer === publicKey ? "freelancer" :
+                chain?.arbiter === publicKey ? "arbiter" : "observer";
 
     const milestones = meta?.milestones ?? [];
     const totalXlm = milestones.reduce((s: number, m: any) => s + Number(m.amount ?? 0), 0);
