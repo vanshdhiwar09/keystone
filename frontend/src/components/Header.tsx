@@ -21,7 +21,6 @@ export default function Header() {
         } else if (!publicKey) {
             connect();
         } else {
-            // Disconnect logically opens up structural unbindings
             disconnect();
         }
     };
