@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useWallet } from "../../context/WalletContext";
-import { fetchJobData, txSubmitMilestone, txApproveMilestone, txRaiseDispute, txDistributeMilestone, txResolveDispute, pollTx, server } from "../../lib/soroban";
+import { fetchJobData, txSubmitMilestone, txApproveMilestone, txRaiseDispute, txDistributeMilestone, txResolveDispute, pollTx, server, ARBITER_ID } from "../../lib/soroban";
 import { TransactionBuilder } from "@stellar/stellar-sdk";
 
 import { fetchJobMetadata, JobMetadataPayload } from "../../lib/api";
@@ -179,7 +179,7 @@ function DetailView({
     const role =
         chain?.client === publicKey ? "client" :
             chain?.freelancer === publicKey ? "freelancer" :
-                chain?.arbiter === publicKey ? "arbiter" : "observer";
+                publicKey === ARBITER_ID ? "arbiter" : "observer";
 
     const milestones = meta?.milestones ?? [];
     const totalXlm = milestones.reduce((s: number, m: any) => s + Number(m.amount ?? 0), 0);
