@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useWallet } from "../../context/WalletContext";
 import { fetchJobMetadata, JobMetadataPayload } from "../../lib/api";
+import { fetchJobData } from "../../lib/soroban";
 
 // ── Status Ring Icons — copied verbatim from reference ────────────────────────
 
@@ -120,9 +121,22 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
             if (!publicKey) return;
             setLoading(true);
             try {
-                const data = await fetchJobMetadata({ wallet: publicKey });
+                // 1. Fetch metadata (which has the milestones list for TVL)
+                const meta = await fetchJobMetadata({ wallet: publicKey });
+                const metaArr = Array.isArray(meta) ? meta : (meta.jobs ?? []);
+
+                // 2. Fetch real on-chain state (for accurate active/dispute/done status rings)
+                const combined = await Promise.all(metaArr.map(async (m: any) => {
+                    try {
+                        const onChain = await fetchJobData(m.jobId, publicKey);
+                        return { ...m, data: onChain };
+                    } catch {
+                        return { ...m, data: null };
+                    }
+                }));
+
                 if (active) {
-                    setJobs(Array.isArray(data) ? data : (data.jobs ?? []));
+                    setJobs(combined);
                 }
             } catch (e) {
                 console.error(e);
