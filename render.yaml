@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: keystone-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: PORT
+        value: 4000
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ESCROW_CONTRACT_ID
+        sync: false
+      - key: NETWORK_PASSPHRASE
+        value: Test SDF Network ; September 2015
+      - key: RPC_URL
+        value: https://soroban-testnet.stellar.org

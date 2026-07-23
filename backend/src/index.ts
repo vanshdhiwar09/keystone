@@ -12,10 +12,15 @@ const port = process.env.PORT || 4000;
 
 // Enable strict CORS specifically bound to the exact origin footprint
 app.use(cors({
-    origin: ["http://localhost:3000"], // NOTE: Update this physically post-Vercel deploy!
+    origin: [process.env.FRONTEND_URL || "http://localhost:3000"],
     methods: ["GET", "POST", "PUT"]
 }));
 app.use(express.json());
+
+// Lightweight health check endpoint confirming the server is alive
+app.get("/health", (req, res) => {
+    res.status(200).json({ status: "ok" });
+});
 
 // Initialize Supabase Server Client statically validating variables
 const supabaseUrl = process.env.SUPABASE_URL || "";
@@ -36,7 +41,7 @@ async function fetchJobOnChain(jobId: number) {
     try {
         // Use Arbiter's real address as the simulation source — it's always funded on testnet.
         // For simulation (read-only), the account doesn't need to broadcast; it just needs a valid key.
-        const ARBITER_ADDRESS = "GC66O7ANIHELSXEAJFF7ES7OMCSYQCMBJT4TESQTNSYJGF4KTP2XET2M";
+        const ARBITER_ADDRESS = process.env.ARBITER_ID || "GC66O7ANIHELSXEAJFF7ES7OMCSYQCMBJT4TESQTNSYJGF4KTP2XET2M";
         const account = new Account(ARBITER_ADDRESS, "0");
         const tx = new TransactionBuilder(account, { fee: "100", networkPassphrase: NETWORK_PASSPHRASE })
             .addOperation(new Contract(ESCROW_CONTRACT_ID).call("get_job", xdr.ScVal.scvU32(jobId)))
