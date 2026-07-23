@@ -369,3 +369,40 @@ export async function pollTx(hash: string, maxAttempts = 10): Promise<any> {
     }
     throw new Error("Transaction polling timed out continuously.");
 }
+
+// ── Shared Job Status & Session Cache ──────────────────────────────────────────
+
+export type JobStatus = "active" | "disputed" | "done";
+
+export function getJobStatus(chainData: any): JobStatus {
+    if (!chainData?.milestones) return "active";
+    const statuses: string[] = chainData.milestones.map((m: any) => String(m?.status ?? "").toLowerCase());
+    if (statuses.some(s => s.includes("dispute"))) return "disputed";
+    if (statuses.every(s => s.includes("approve") || s.includes("release") || s.includes("refund"))) return "done";
+    return "active";
+}
+
+const jobSessionCache = new Map<number, { chainData: any; status: JobStatus }>();
+
+export function invalidateJobCache(jobId: number) {
+    jobSessionCache.delete(jobId);
+}
+
+export async function fetchJobDataEnriched(jobId: number, sourcePublicKey: string, forceRefresh = false) {
+    if (!forceRefresh) {
+        const cached = jobSessionCache.get(jobId);
+        if (cached) return cached;
+    }
+    const chainData = await fetchJobData(jobId, sourcePublicKey);
+    if (!chainData) {
+        if (process.env.NODE_ENV === "development") {
+            console.warn(`[Dev Only] fetchJobData returned null for jobId ${jobId}`);
+        }
+        return { chainData: null, status: "active" as JobStatus };
+    }
+    const status = getJobStatus(chainData);
+    const result = { chainData, status };
+    jobSessionCache.set(jobId, result);
+    return result;
+}
+

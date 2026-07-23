@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useWallet } from "../../context/WalletContext";
-import { fetchJobData, ARBITER_ID } from "../../lib/soroban";
+import { fetchJobData, ARBITER_ID, JobStatus, getJobStatus } from "../../lib/soroban";
 import { fetchJobMetadata, JobMetadataPayload } from "../../lib/api";
 
 function RingActive() {
@@ -80,15 +80,6 @@ function HeroArch() {
 
 function truncate(str: string) { return str ? `${str.slice(0, 4)}…${str.slice(-4)}` : "—"; }
 
-type JobStatus = "active" | "disputed" | "done";
-
-function getJobStatus(chainData: any): JobStatus {
-    if (!chainData?.milestones) return "active";
-    const statuses: string[] = chainData.milestones.map((m: any) => String(m?.status ?? "").toLowerCase());
-    if (statuses.some(s => s.includes("dispute"))) return "disputed";
-    if (statuses.every(s => s.includes("approve") || s.includes("release") || s.includes("refund"))) return "done";
-    return "active";
-}
 
 function getMilestoneProgress(meta: JobMetadataPayload, chainData: any) {
     const total = meta.milestones?.length ?? 0;

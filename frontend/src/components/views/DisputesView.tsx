@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useWallet } from "../../context/WalletContext";
 import { fetchJobMetadata, JobMetadataPayload } from "../../lib/api";
-import { fetchJobData, txResolveDispute, pollTx, server, ARBITER_ID } from "../../lib/soroban";
+import { fetchJobData, txResolveDispute, pollTx, server, ARBITER_ID, invalidateJobCache } from "../../lib/soroban";
 import { TransactionBuilder } from "@stellar/stellar-sdk";
 import { signTransaction } from "@stellar/freighter-api";
 import { useToast } from "../../context/ToastContext";
@@ -104,6 +104,7 @@ export default function DisputesView() {
             await pollTx(submitted.hash);
             dismissToast(toastId);
             toast.success("Transaction completed.");
+            invalidateJobCache(jobId);
             await load();
         } catch (e: any) {
             dismissToast(toastId);

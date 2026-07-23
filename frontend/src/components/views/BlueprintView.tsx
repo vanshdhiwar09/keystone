@@ -7,7 +7,8 @@ import {
     fetchJobData,
     txSubmitMilestone, txApproveMilestone, txRaiseDispute,
     txDistributeMilestone, txResolveDispute, txFundMilestone,
-    pollTx, server, ARBITER_ID
+    pollTx, server, ARBITER_ID,
+    fetchJobDataEnriched, invalidateJobCache, JobStatus
 } from "../../lib/soroban";
 import { TransactionBuilder } from "@stellar/stellar-sdk";
 import { fetchJobMetadata, JobMetadataPayload, updateDisputeMetadata } from "../../lib/api";
@@ -160,6 +161,7 @@ function RaiseDisputeModal({
 
             dismissToast(toastId);
             toast.success("Transaction completed.");
+            invalidateJobCache(jobId);
             onSuccess();
             onClose();
         } catch (e: any) {
@@ -335,6 +337,7 @@ function MilestoneActions({
             setMsg("Transaction completed.");
             dismissToast(toastId);
             toast.success("Transaction completed.");
+            invalidateJobCache(jobId);
             setTimeout(() => {
                 setMsg("");
                 onSuccess();
@@ -627,10 +630,45 @@ function DetailView({
 
 // ── Explorer (List) View ──────────────────────────────────────────────────────
 
+function RingActive() {
+    return (
+        <div className="status-ring ring-active">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+        </div>
+    );
+}
+
+function RingDispute() {
+    return (
+        <div className="status-ring ring-dispute">
+            <span style={{ fontWeight: 800, fontFamily: "sans-serif" }}>!</span>
+        </div>
+    );
+}
+
+function RingDone() {
+    return (
+        <div className="status-ring ring-done">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <polyline points="20 6 9 17 4 12" />
+            </svg>
+        </div>
+    );
+}
+
+interface ExplorerJob {
+    meta: JobMetadataPayload;
+    chain: any;
+    status: JobStatus;
+    loadingStatus: boolean;
+}
+
 function ExplorerView({ onSelect }: { onSelect: (id: number, meta: JobMetadataPayload) => void }) {
     const { publicKey } = useWallet();
     const [search, setSearch] = useState("");
-    const [jobs, setJobs] = useState<JobMetadataPayload[]>([]);
+    const [jobs, setJobs] = useState<ExplorerJob[]>([]);
     const [loading, setLoading] = useState(true);
 
     const load = useCallback(async (q: string) => {
@@ -638,6 +676,7 @@ function ExplorerView({ onSelect }: { onSelect: (id: number, meta: JobMetadataPa
         try {
             const data = await fetchJobMetadata();
             const allJobs: JobMetadataPayload[] = Array.isArray(data) ? data : (data.jobs ?? []);
+
             const filtered = q
                 ? allJobs.filter(j =>
                     String(j.jobId).includes(q) ||
@@ -646,10 +685,45 @@ function ExplorerView({ onSelect }: { onSelect: (id: number, meta: JobMetadataPa
                     (j.freelancerAddress ?? "").toLowerCase().includes(q.toLowerCase())
                 )
                 : allJobs;
-            setJobs(filtered);
+
+            const initialJobs: ExplorerJob[] = filtered.map(meta => ({
+                meta,
+                chain: null,
+                status: "active",
+                loadingStatus: true
+            }));
+
+            setJobs(initialJobs);
+            setLoading(false);
+
+            // Fetch on-chain status in parallel
+            const enrichedPromises = initialJobs.map(async (job) => {
+                try {
+                    const fallbackKey = "GC66O7ANIHELSXEAJFF7ES7OMCSYQCMBJT4TESQTNSYJGF4KTP2XET2M";
+                    const { chainData, status } = await fetchJobDataEnriched(job.meta.jobId, publicKey || fallbackKey);
+                    return {
+                        ...job,
+                        chain: chainData,
+                        status,
+                        loadingStatus: false
+                    };
+                } catch (e) {
+                    if (process.env.NODE_ENV === "development") {
+                        console.error(`Error loading status for jobId ${job.meta.jobId}:`, e);
+                    }
+                    return {
+                        ...job,
+                        chain: null,
+                        status: "active" as JobStatus,
+                        loadingStatus: false
+                    };
+                }
+            });
+
+            const finalJobs = await Promise.all(enrichedPromises);
+            setJobs(finalJobs);
         } catch {
             setJobs([]);
-        } finally {
             setLoading(false);
         }
     }, [publicKey]);
@@ -658,6 +732,9 @@ function ExplorerView({ onSelect }: { onSelect: (id: number, meta: JobMetadataPa
         const t = setTimeout(() => load(search), 350);
         return () => clearTimeout(t);
     }, [search, load]);
+
+    const statusLabel = (s: JobStatus) => s === "disputed" ? "Disputed" : s === "done" ? "Complete" : "In Progress";
+    const statusColor = (s: JobStatus) => s === "disputed" ? "var(--oxide)" : s === "done" ? "var(--iron)" : "var(--banknote)";
 
     return (
         <div id="view-explorer" className="page-view active">
@@ -692,37 +769,49 @@ function ExplorerView({ onSelect }: { onSelect: (id: number, meta: JobMetadataPa
                     </div>
                 )}
 
-                {jobs.map((job) => {
-                    const totalXlm = job.milestones?.reduce((s, m) => s + Number(m.amount ?? 0), 0) ?? 0;
+                {!loading && jobs.map((job) => {
+                    const totalXlm = job.meta.milestones?.reduce((s, m) => s + Number(m.amount ?? 0), 0) ?? 0;
                     return (
                         <div
-                            key={job.jobId}
+                            key={job.meta.jobId}
                             className="contract-module"
-                            onClick={() => onSelect(job.jobId, job)}
+                            onClick={() => onSelect(job.meta.jobId, job.meta)}
                             role="button"
                             tabIndex={0}
-                            onKeyDown={e => e.key === "Enter" && onSelect(job.jobId, job)}
+                            onKeyDown={e => e.key === "Enter" && onSelect(job.meta.jobId, job.meta)}
+                            style={{ cursor: "pointer" }}
                         >
                             <div>
-                                <p className="c-title display">
-                                    {job.title || `Contract ${String(job.jobId).padStart(3, "0")}`}
+                                <p className="c-title display" style={{ marginBottom: 4 }}>
+                                    {job.meta.title || `Contract ${String(job.meta.jobId).padStart(3, "0")}`}
                                 </p>
-                                <p className="c-meta mono">
-                                    {truncate(job.clientAddress)} · {job.milestones?.length ?? 0} milestone{(job.milestones?.length ?? 0) !== 1 ? "s" : ""}
+                                <p className="c-meta mono" style={{ fontSize: 12 }}>
+                                    {truncate(job.meta.clientAddress)} · {job.meta.milestones?.length ?? 0} milestone{(job.meta.milestones?.length ?? 0) !== 1 ? "s" : ""}
                                 </p>
                             </div>
+
                             <div className="c-status">
-                                <div className="status-ring ring-active">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                                    </svg>
-                                </div>
-                                <span className="uppercase" style={{ color: "var(--banknote)" }}>Active</span>
+                                {job.loadingStatus ? (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.5 }}>
+                                        <div className="status-ring ring-active" style={{ animation: "pulse 1.5s infinite" }}>
+                                            <span style={{ fontSize: 9, opacity: 0.5 }}>•</span>
+                                        </div>
+                                        <span className="uppercase" style={{ color: "rgba(22,26,29,0.3)" }}>Loading</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {job.status === "active" && <RingActive />}
+                                        {job.status === "disputed" && <RingDispute />}
+                                        {job.status === "done" && <RingDone />}
+                                        <span className="uppercase" style={{ color: statusColor(job.status) }}>{statusLabel(job.status)}</span>
+                                    </>
+                                )}
                             </div>
+
                             <div className="c-value mono">
                                 {totalXlm > 0 ? `${totalXlm} XLM` : "—"}
                             </div>
-                            <div style={{ textAlign: "right" }}>
+                            <div style={{ textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
                                 <span style={{ fontSize: 24, opacity: 0.3 }}>→</span>
                             </div>
                         </div>
