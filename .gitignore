@@ -10,3 +10,25 @@
 
 # OSX
 .DS_Store
+
+# Rust build artifacts
+target/
+
+# Legacy UI prototype files
+keystone (2).html
+keystone_ui_preview.html
+keystone-fixed.html
+
+# Development notes / reference files
+next_help.txt
+npm_versions.txt
+tree_final.txt
+
+# Optional helper scripts
+crate_tests.bat
+day6_verify.bat
+install.bat
+test_and_build.bat
+
+# Temporary logs
+*.log
