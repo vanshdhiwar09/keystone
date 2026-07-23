@@ -9,6 +9,7 @@ import BlueprintView from "../components/views/BlueprintView";
 import VaultView from "../components/views/VaultView";
 import TerminalView from "../components/views/TerminalView";
 import ActivityView from "../components/views/ActivityView";
+import DisputesView from "../components/views/DisputesView";
 
 export default function Home() {
   const [activeView, setActiveView] = useState("dashboard");
@@ -30,7 +31,8 @@ export default function Home() {
       {isBlueprintView && <BlueprintView setView={setActiveView} initialJobId={blueprintJobId} />}
       {(activeView === "vault" || activeView === "create") && <VaultView setView={setActiveView} />}
       {activeView === "tx" && <TerminalView />}
-      {activeView === "feed" && <ActivityView />}
+      {activeView === "feed" && <ActivityView setView={setActiveView} />}
+      {activeView === "disputes" && <DisputesView />}
 
       <NavigationDock activeView={dockView} setActiveView={setActiveView} />
     </>

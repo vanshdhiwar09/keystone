@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useWallet } from "../../context/WalletContext";
-import { fetchJobData } from "../../lib/soroban";
-
-// ── Status Ring Icons — copied verbatim from reference ────────────────────────
+import { fetchJobData, ARBITER_ID } from "../../lib/soroban";
+import { fetchJobMetadata, JobMetadataPayload } from "../../lib/api";
 
 function RingActive() {
     return (
@@ -33,8 +32,6 @@ function RingDone() {
         </div>
     );
 }
-
-// ── Hero Arch SVG — animated masonry arch ─────────────────────────────────────
 
 function HeroArch() {
     const [mounted, setMounted] = useState(false);
@@ -81,71 +78,91 @@ function HeroArch() {
     );
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+function truncate(str: string) { return str ? `${str.slice(0, 4)}…${str.slice(-4)}` : "—"; }
 
-function truncate(str: string) { return `${str.slice(0, 4)}…${str.slice(-4)}`; }
+type JobStatus = "active" | "disputed" | "done";
 
-function getJobStatus(job: any): "active" | "disputed" | "done" {
-    const raw = job.data?.status;
-    const s = Array.isArray(raw) ? raw[0] : raw;
-    if (!s) return "active";
-    const str = typeof s === "string" ? s.toLowerCase() : "";
-    if (str.includes("dispute")) return "disputed";
-    if (str.includes("complete") || str.includes("release") || str.includes("refund")) return "done";
+function getJobStatus(chainData: any): JobStatus {
+    if (!chainData?.milestones) return "active";
+    const statuses: string[] = chainData.milestones.map((m: any) => String(m?.status ?? "").toLowerCase());
+    if (statuses.some(s => s.includes("dispute"))) return "disputed";
+    if (statuses.every(s => s.includes("approve") || s.includes("release") || s.includes("refund"))) return "done";
     return "active";
 }
 
-function getStatusLabel(status: "active" | "disputed" | "done"): string {
-    if (status === "disputed") return "Disputed";
-    if (status === "done") return "Complete";
-    return "In Progress";
+function getMilestoneProgress(meta: JobMetadataPayload, chainData: any) {
+    const total = meta.milestones?.length ?? 0;
+    if (!total || !chainData?.milestones) return { done: 0, total };
+    const done = chainData.milestones.filter((m: any) => {
+        const s = String(m?.status ?? "").toLowerCase();
+        return s.includes("approve") || s.includes("release");
+    }).length;
+    return { done, total };
 }
 
-function getStatusColor(status: "active" | "disputed" | "done"): string {
-    if (status === "disputed") return "var(--oxide)";
-    if (status === "done") return "var(--iron)";
-    return "var(--banknote)";
+interface DashboardJob {
+    meta: JobMetadataPayload;
+    chain: any;
+    status: JobStatus;
 }
-
-// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function DashboardView({ setView }: { setView: (v: string) => void }) {
     const { publicKey } = useWallet();
-    const [jobs, setJobs] = useState<any[]>([]);
+    const [jobs, setJobs] = useState<DashboardJob[]>([]);
     const [loading, setLoading] = useState(false);
 
-    // On-chain polling — scan job IDs 1..20 and filter by wallet
     useEffect(() => {
         let active = true;
-        async function fetchJobs() {
+        async function loadJobs() {
             if (!publicKey) return;
             setLoading(true);
-            const found: any[] = [];
+            try {
+                const isArbiter = publicKey === ARBITER_ID;
+                const res = await fetchJobMetadata(isArbiter ? undefined : { wallet: publicKey });
+                const metaJobs: JobMetadataPayload[] = Array.isArray(res) ? res : (res.jobs ?? []);
 
-            for (let i = 1; i <= 20; i++) {
-                try {
-                    const val = await fetchJobData(i, publicKey);
-                    if (val && (val.client === publicKey || val.freelancer === publicKey)) {
-                        found.push({ id: i, data: val });
+                const found: DashboardJob[] = [];
+                for (const meta of metaJobs) {
+                    try {
+                        const chain = await fetchJobData(meta.jobId, publicKey);
+                        found.push({ meta, chain, status: getJobStatus(chain) });
+                    } catch {
+                        found.push({ meta, chain: null, status: "active" });
                     }
-                } catch {
-                    // Job doesn't exist at this ID — continue scanning
                 }
-            }
-            if (active) {
-                setJobs(found);
-                setLoading(false);
+
+                if (active) setJobs(found);
+            } catch (err) {
+                console.error("Dashboard job fetch error", err);
+            } finally {
+                if (active) setLoading(false);
             }
         }
-        fetchJobs();
+        loadJobs();
         return () => { active = false; };
     }, [publicKey]);
 
+    const statusLabel = (s: JobStatus) => s === "disputed" ? "Disputed" : s === "done" ? "Complete" : "In Progress";
+    const statusColor = (s: JobStatus) => s === "disputed" ? "var(--oxide)" : s === "done" ? "var(--iron)" : "var(--banknote)";
+
+    const isArbiter = publicKey === ARBITER_ID;
+    const isFreelancer = !isArbiter && jobs.some(j => j.meta.freelancerAddress === publicKey);
+
+    const countLabel = isArbiter
+        ? (jobs.length === 1 ? "Job Under Jurisdiction" : "Jobs Under Jurisdiction")
+        : isFreelancer
+            ? (jobs.length === 1 ? "Assigned Contract" : "Assigned Contracts")
+            : (jobs.length === 1 ? "Contract Active" : "Contracts Active");
+
+    const amountLabel = isArbiter
+        ? "Escrow Under Mgt"
+        : isFreelancer
+            ? "Escrow Associated"
+            : "Total Escrow Funded";
+
     return (
         <main className="page-view active" id="view-dashboard">
-            {/* ── Dashboard Grid — 2-column reference layout ── */}
             <div className="dashboard-grid">
-
                 {/* Left: Hero Statement */}
                 <div className="hero-statement">
                     <h2 className="display">
@@ -157,19 +174,22 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                         No invoicing, no chasing, no intermediaries.
                     </p>
 
-                    {/* Stats row — reference design */}
                     <div style={{ display: "flex", gap: 40, marginTop: 60 }}>
                         <div>
                             <p className="mono" style={{ fontSize: 32, fontWeight: 600, color: "var(--iron)" }}>
                                 {jobs.length > 0 ? `${jobs.length}` : "—"}
                             </p>
                             <p className="uppercase" style={{ color: "rgba(22,26,29,0.5)" }}>
-                                {jobs.length === 1 ? "Contract Active" : "Contracts Active"}
+                                {countLabel}
                             </p>
                         </div>
                         <div>
-                            <p className="mono" style={{ fontSize: 32, fontWeight: 600, color: "var(--iron)" }}>100%</p>
-                            <p className="uppercase" style={{ color: "rgba(22,26,29,0.5)" }}>Release Rate</p>
+                            <p className="mono" style={{ fontSize: 32, fontWeight: 600, color: "var(--iron)" }}>
+                                {jobs.length > 0
+                                    ? `${jobs.reduce((sum, j) => sum + (j.meta.milestones?.reduce((s, m) => s + Number(m.amount ?? 0), 0) ?? 0), 0)} XLM`
+                                    : "—"}
+                            </p>
+                            <p className="uppercase" style={{ color: "rgba(22,26,29,0.5)" }}>{amountLabel}</p>
                         </div>
                     </div>
                 </div>
@@ -179,7 +199,7 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                     <HeroArch />
                 </div>
 
-                {/* Bottom: Active Contracts — spans full width */}
+                {/* Bottom: Active Contracts */}
                 <div className="contracts-section">
                     <div className="section-header">
                         <h3 className="display section-title">Active Contracts</h3>
@@ -195,7 +215,7 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                     <div>
                         {loading && (
                             <p className="uppercase" style={{ color: "rgba(22,26,29,0.4)", padding: "40px 0" }}>
-                                Scanning on-chain contracts…
+                                Loading contracts…
                             </p>
                         )}
 
@@ -203,7 +223,13 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                             <div className="contract-module" style={{ opacity: 0.4, pointerEvents: "none" }}>
                                 <div>
                                     <p className="c-title display">No Active Contracts</p>
-                                    <p className="c-meta mono">Deploy your first escrow to get started</p>
+                                    <p className="c-meta mono">
+                                        {isArbiter
+                                            ? "Awaiting disputes or contracts under jurisdiction"
+                                            : isFreelancer
+                                                ? "Awaiting escrow assignments from clients"
+                                                : "Deploy your first escrow to get started"}
+                                    </p>
                                 </div>
                                 <div className="c-status">
                                     <RingDone />
@@ -216,42 +242,67 @@ export default function DashboardView({ setView }: { setView: (v: string) => voi
                             </div>
                         )}
 
-                        {jobs.map(job => {
-                            const status = getJobStatus(job);
-                            const label = getStatusLabel(status);
-                            const color = getStatusColor(status);
-                            const roleLabel = job.data.client === publicKey ? "Client" : "Freelancer";
-                            const counterparty = job.data.client === publicKey
-                                ? truncate(job.data.freelancer || "")
-                                : truncate(job.data.client || "");
-
-                            // Calculate TVL from on-chain amount (in stroops → XLM)
-                            const amountStroops = Number(job.data.amount ?? 0);
-                            const tvl = amountStroops > 0 ? (amountStroops / 10000000).toFixed(1) : "—";
+                        {jobs.map(({ meta, chain, status }) => {
+                            const totalXlm = meta.milestones?.reduce((s, m) => s + Number(m.amount ?? 0), 0) ?? 0;
+                            const { done, total } = getMilestoneProgress(meta, chain);
+                            const isArbiter = publicKey === ARBITER_ID;
+                            const roleLabel = isArbiter ? "Arbiter"
+                                : chain?.client === publicKey ? "Client"
+                                    : "Freelancer";
 
                             return (
                                 <div
-                                    key={job.id}
+                                    key={meta.jobId}
                                     className="contract-module"
-                                    onClick={() => setView(`blueprint:${job.id}`)}
+                                    onClick={() => setView(`blueprint:${meta.jobId}`)}
                                     role="button"
                                     tabIndex={0}
-                                    onKeyDown={e => e.key === "Enter" && setView(`blueprint:${job.id}`)}
+                                    onKeyDown={e => e.key === "Enter" && setView(`blueprint:${meta.jobId}`)}
+                                    style={{ cursor: "pointer" }}
                                 >
+                                    {/* Column 1: Title & Meta */}
                                     <div>
-                                        <p className="c-title display">Contract {job.id.toString().padStart(3, "0")}</p>
-                                        <p className="c-meta mono">{roleLabel} · {counterparty}</p>
+                                        <p className="c-title display" style={{ marginBottom: 4 }}>
+                                            {meta.title || `Contract ${String(meta.jobId).padStart(3, "0")}`}
+                                        </p>
+                                        {meta.description && (
+                                            <p className="c-meta" style={{ color: "rgba(22,26,29,0.5)", fontSize: 13, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 480 }}>
+                                                {meta.description}
+                                            </p>
+                                        )}
+                                        <p className="c-meta mono" style={{ fontSize: 12 }}>
+                                            {roleLabel} · {total > 0 ? `${done}/${total} milestones` : "No milestones"}
+                                        </p>
                                     </div>
+
+                                    {/* Column 2: Status */}
                                     <div className="c-status">
                                         {status === "active" && <RingActive />}
                                         {status === "disputed" && <RingDispute />}
                                         {status === "done" && <RingDone />}
-                                        <span className="uppercase" style={{ color }}>{label}</span>
+                                        <span className="uppercase" style={{ color: statusColor(status) }}>{statusLabel(status)}</span>
                                     </div>
-                                    <div className="c-value mono">{tvl} XLM</div>
-                                    <div style={{ textAlign: "right" }}>
+
+                                    {/* Column 3 & 4: Value and Arrow merged and right-aligned */}
+                                    <div style={{ gridColumn: "3 / 5", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 16 }}>
+                                        <div className="c-value mono">
+                                            {totalXlm > 0 ? `${totalXlm} XLM` : "—"}
+                                        </div>
                                         <span style={{ fontSize: 24, opacity: 0.3 }}>→</span>
                                     </div>
+
+                                    {/* Spanned Row: Progress bar */}
+                                    {total > 0 && (
+                                        <div style={{ gridColumn: "1 / -1", width: "100%", height: 3, background: "rgba(22,26,29,0.08)", borderRadius: 2, marginTop: 24 }}>
+                                            <div style={{
+                                                width: `${Math.round((done / total) * 100)}%`,
+                                                height: "100%",
+                                                background: status === "disputed" ? "var(--oxide)" : "var(--brass)",
+                                                borderRadius: 2,
+                                                transition: "width 0.4s ease"
+                                            }} />
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

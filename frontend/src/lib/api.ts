@@ -6,7 +6,7 @@ export interface JobMetadataPayload {
     description: string;
     clientAddress: string;
     freelancerAddress: string;
-    milestones: { title: string; description: string }[];
+    milestones: { title: string; description: string; amount?: number }[];
     timestamp: number;
     signedMessage: string | any;
 }
@@ -44,6 +44,29 @@ export async function fetchJobMetadata(params?: { search?: string, wallet?: stri
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Failed to fetch Metadata arrays securely. Status: ${res.status}`);
+    }
+    return res.json();
+}
+
+/**
+ * Updates dispute metadata in the database on Supabase when a dispute is raised.
+ */
+export async function updateDisputeMetadata(payload: {
+    jobId: number;
+    milestoneIndex: number;
+    disputeTitle: string;
+    disputeDescription: string;
+    disputeNotes?: string;
+}) {
+    const res = await fetch(`${BACKEND_URL}/api/milestones/dispute`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to update dispute metadata. Status: ${res.status}`);
     }
     return res.json();
 }

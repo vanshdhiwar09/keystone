@@ -5,6 +5,7 @@ import { StrKey, TransactionBuilder, xdr, scValToNative } from "@stellar/stellar
 import { signTransaction, signMessage } from "@stellar/freighter-api";
 import { useWallet } from "../context/WalletContext";
 import { useTx } from "../context/TransactionContext";
+import { useToast } from "../context/ToastContext";
 import {
     txCreateJob,
     txAddMilestone,
@@ -14,6 +15,12 @@ import {
     TOKEN_CONTRACT_ID
 } from "../lib/soroban";
 import { createJobMetadata } from "../lib/api";
+import {
+    validateAmount,
+    validateDescription,
+    validateProjectTitle,
+    validateRequiredText
+} from "../lib/validation";
 
 interface MilestoneInput {
     title: string;
@@ -22,7 +29,6 @@ interface MilestoneInput {
 }
 
 function stroopsFromXlm(amount: string): bigint {
-    // Precise string-based conversion — avoids float imprecision (e.g. 0.58 * 1e7 = 5799999.999)
     const parts = amount.split(".");
     const whole = parts[0] || "0";
     const fraction = (parts[1] || "").substring(0, 7).padEnd(7, "0");
@@ -32,9 +38,8 @@ function stroopsFromXlm(amount: string): bigint {
 export default function CreateJobFlow({ setView }: { setView?: (v: string) => void }) {
     const { publicKey } = useWallet();
     const { setState, resetTx } = useTx();
+    const { toast, dismissToast, isUserCancellation, getFriendlyErrorMessage } = useToast();
 
-    // Step state: 1 = Parties, 2 = Milestones, 3 = Metadata, 4 = Deploying
-    const [step, setStep] = useState(1);
     const [freelancer, setFreelancer] = useState("");
     const [milestones, setMilestones] = useState<MilestoneInput[]>([
         { title: "", description: "", amount: "" }
@@ -43,6 +48,8 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
     const [jobDescription, setJobDescription] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [deployed, setDeployed] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     const addMilestone = () => {
         setMilestones(prev => [...prev, { title: "", description: "", amount: "" }]);
@@ -57,8 +64,14 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
     };
 
     const removeMilestone = (index: number) => {
-        if (milestones.length <= 1) return; // Always keep at least 1
+        if (milestones.length <= 1) return;
         setMilestones(prev => prev.filter((_, i) => i !== index));
+        setErrors(prev => {
+            const copy = { ...prev };
+            delete copy[`m_${index}_title`];
+            delete copy[`m_${index}_amount`];
+            return copy;
+        });
     };
 
     const allMilestonesValid = milestones.every(m =>
@@ -67,7 +80,61 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
         parseFloat(m.amount) > 0
     );
 
+    const totalXlm = milestones.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
+
+    const canDeploy = publicKey &&
+        StrKey.isValidEd25519PublicKey(freelancer) &&
+        allMilestonesValid;
+
     const handleDeploy = async () => {
+        const newErrors: Record<string, string> = {};
+
+        const titleErr = validateProjectTitle(jobTitle);
+        if (titleErr) newErrors.title = titleErr;
+
+        const descErr = validateDescription(jobDescription);
+        if (descErr) newErrors.description = descErr;
+
+        if (!freelancer.trim()) {
+            newErrors.freelancer = "Freelancer Address is required.";
+        } else if (!StrKey.isValidEd25519PublicKey(freelancer)) {
+            newErrors.freelancer = "Invalid Stellar public key.";
+        }
+
+        milestones.forEach((m, i) => {
+            const mTitleErr = validateRequiredText(m.title, `Milestone ${i + 1} Title`, 3, 100);
+            if (mTitleErr) newErrors[`m_${i}_title`] = mTitleErr;
+
+            const mAmountErr = validateAmount(m.amount);
+            if (mAmountErr) newErrors[`m_${i}_amount`] = mAmountErr;
+        });
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            toast.error("Please resolve validation errors first.");
+
+            setTimeout(() => {
+                const firstErrKey = Object.keys(newErrors)[0];
+                let query = "";
+                if (firstErrKey === "title") query = "input[placeholder='Landing page redesign']";
+                else if (firstErrKey === "description") query = "textarea[placeholder*='Full redesign']";
+                else if (firstErrKey === "freelancer") query = "input[placeholder*='GABC']";
+                else if (firstErrKey.startsWith("m_")) {
+                    const parts = firstErrKey.split("_");
+                    const index = parseInt(parts[1]);
+                    const type = parts[2];
+                    if (type === "title") query = `div.milestone-builder-block:nth-of-type(${index + 1}) input[placeholder='Wireframes']`;
+                    else query = `div.milestone-builder-block:nth-of-type(${index + 1}) input[placeholder='150']`;
+                }
+
+                if (query) {
+                    const el = document.querySelector(query) as HTMLElement;
+                    if (el) el.focus();
+                }
+            }, 100);
+            return;
+        }
+
         if (!publicKey || !signTransaction || !signMessage) {
             setError("Wallet not connected or Freighter unavailable.");
             return;
@@ -75,22 +142,27 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
 
         setIsLoading(true);
         setError(null);
+        const toastId = toast.loading("Preparing transaction...");
 
         try {
-            // ── STEP 1: create_job ─────────────────────────────────────────────────
+            // ── STEP 1: create_job ──
             setState({
                 step: "awaiting_signature",
                 title: "Step 1 of 3: Create Job",
-                sub: "Sign the create_job transaction in Freighter.",
+                sub: "Awaiting wallet signature...",
                 progress: 10
             });
+            if (setView) setView("tx");
 
             const createTx = await txCreateJob(publicKey, freelancer, TOKEN_CONTRACT_ID);
             const { signedTxXdr: signedCreate } = await signTransaction(createTx.toXDR(), {
                 networkPassphrase: "Test SDF Network ; September 2015"
             });
+            if (!signedCreate) {
+                throw new Error("User declined to sign");
+            }
 
-            setState({ step: "submitting", title: "Step 1 of 3: Create Job", sub: "Broadcasting to the Soroban network…", progress: 20 });
+            setState({ step: "submitting", title: "Step 1 of 3: Create Job", sub: "Submitting transaction...", progress: 20 });
 
             const submittedCreate = await server.sendTransaction(
                 TransactionBuilder.fromXDR(signedCreate, "Test SDF Network ; September 2015") as any
@@ -100,104 +172,92 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
                 throw new Error(`Unexpected submission status: ${submittedCreate.status}`);
             }
 
-            setState({ step: "submitting", title: "Step 1 of 3: Create Job", sub: "Awaiting ledger confirmation…", progress: 30 });
+            setState({ step: "submitting", title: "Step 1 of 3: Create Job", sub: "Confirming transaction...", progress: 30 });
             const confirmedCreate = await pollTx(submittedCreate.hash);
 
-            // Extract Job ID — read from the confirmed transaction's returnVal via resultMetaXdr
-            // The create_job function returns the new job_id as a u32 ScVal.
-            // We parse it from resultMetaXdr which is reliably populated post-confirmation.
-            let jobId: number | null = null;
-            try {
-                if (confirmedCreate.resultMetaXdr) {
-                    const meta = xdr.TransactionMeta.fromXDR(confirmedCreate.resultMetaXdr, "base64");
-                    // V3 meta stores operation results in sorobanMeta
-                    const retval = (meta as any).v3?.sorobanMeta?.returnValue;
-                    if (retval) {
-                        jobId = Number(scValToNative(retval));
-                    }
-                }
-            } catch {
-                // If extraction fails, throw so the user knows to check Stellar Expert
-                throw new Error("Could not read Job ID from on-chain response. Check Stellar Expert for the transaction.");
+            // ── Proven extraction: read returnValue directly from pollTx result ──
+            const rpcVal = (confirmedCreate as any).returnValue;
+            const xdrVal = typeof rpcVal === "string"
+                ? xdr.ScVal.fromXDR(rpcVal, "base64")
+                : rpcVal;
+            const jobId = parseInt(String(scValToNative(xdrVal)), 10);
+
+            if (!jobId || isNaN(jobId)) {
+                throw new Error("Job created, but could not extract Job ID. Check Stellar Expert.");
             }
 
-            if (jobId === null || jobId === undefined || isNaN(jobId)) {
-                throw new Error("Invalid Job ID returned from create_job.");
-            }
-
-
-            // ── STEP 2: add_milestone × N ──────────────────────────────────────────
+            // ── STEP 2: add_milestone + fund_milestone for each milestone ──
             for (let i = 0; i < milestones.length; i++) {
                 const m = milestones[i];
-                const amountInStroops = stroopsFromXlm(m.amount);
+                const stroops = stroopsFromXlm(m.amount);
 
+                // Add milestone
+                const progress1 = 30 + ((i / milestones.length) * 35);
                 setState({
                     step: "awaiting_signature",
-                    title: `Step 2 of 3: Add Milestone ${i + 1}/${milestones.length}`,
-                    sub: `Sign add_milestone for "${m.title}" in Freighter.`,
-                    progress: 35 + Math.floor((i / milestones.length) * 20)
+                    title: `Step 2 of 3: Milestone ${i + 1}/${milestones.length}`,
+                    sub: "Awaiting wallet signature...",
+                    progress: progress1
                 });
 
-                const addTx = await txAddMilestone(publicKey, jobId, amountInStroops);
+                const addTx = await txAddMilestone(publicKey, jobId, stroops);
                 const { signedTxXdr: signedAdd } = await signTransaction(addTx.toXDR(), {
                     networkPassphrase: "Test SDF Network ; September 2015"
                 });
+                if (!signedAdd) {
+                    throw new Error("User declined to sign");
+                }
 
-                setState({
-                    step: "submitting",
-                    title: `Step 2 of 3: Add Milestone ${i + 1}/${milestones.length}`,
-                    sub: "Confirming on ledger…",
-                    progress: 40 + Math.floor((i / milestones.length) * 20)
-                });
+                setState({ step: "submitting", title: `Step 2 of 3: Milestone ${i + 1}/${milestones.length}`, sub: "Submitting transaction...", progress: progress1 + 5 });
 
-                const addSubmit = await server.sendTransaction(
+                const submittedAdd = await server.sendTransaction(
                     TransactionBuilder.fromXDR(signedAdd, "Test SDF Network ; September 2015") as any
                 );
-                if (addSubmit.status !== "PENDING") throw new Error(`add_milestone submit failed: ${addSubmit.status}`);
-                await pollTx(addSubmit.hash);
-            }
+                if (submittedAdd.status !== "PENDING") throw new Error(`add_milestone failed: ${submittedAdd.status}`);
 
-            // ── STEP 3: fund_milestone × N ─────────────────────────────────────────
-            for (let i = 0; i < milestones.length; i++) {
-                const milestoneId = i + 1;
+                setState({ step: "submitting", title: `Step 2 of 3: Milestone ${i + 1}/${milestones.length}`, sub: "Confirming transaction...", progress: progress1 + 10 });
+                await pollTx(submittedAdd.hash);
 
+                // Fund milestone
+                const progress2 = 30 + (((i + 0.5) / milestones.length) * 35);
                 setState({
                     step: "awaiting_signature",
-                    title: `Step 3 of 3: Fund Milestone ${i + 1}/${milestones.length}`,
-                    sub: `Sign fund_milestone #${milestoneId} in Freighter.`,
-                    progress: 60 + Math.floor((i / milestones.length) * 20)
+                    title: `Step 2 of 3: Funding Milestone ${i + 1}`,
+                    sub: "Awaiting wallet signature...",
+                    progress: progress2
                 });
 
-                const fundTx = await txFundMilestone(publicKey, jobId, milestoneId);
+                const fundTx = await txFundMilestone(publicKey, jobId, i + 1);
                 const { signedTxXdr: signedFund } = await signTransaction(fundTx.toXDR(), {
                     networkPassphrase: "Test SDF Network ; September 2015"
                 });
+                if (!signedFund) {
+                    throw new Error("User declined to sign");
+                }
 
-                setState({
-                    step: "submitting",
-                    title: `Step 3 of 3: Fund Milestone ${i + 1}/${milestones.length}`,
-                    sub: "Confirming on ledger…",
-                    progress: 65 + Math.floor((i / milestones.length) * 20)
-                });
+                setState({ step: "submitting", title: `Step 2 of 3: Funding Milestone ${i + 1}`, sub: "Submitting transaction...", progress: progress2 + 5 });
 
-                const fundSubmit = await server.sendTransaction(
+                const submittedFund = await server.sendTransaction(
                     TransactionBuilder.fromXDR(signedFund, "Test SDF Network ; September 2015") as any
                 );
-                if (fundSubmit.status !== "PENDING") throw new Error(`fund_milestone submit failed: ${fundSubmit.status}`);
-                await pollTx(fundSubmit.hash);
+                if (submittedFund.status !== "PENDING") throw new Error(`fund_milestone failed: ${submittedFund.status}`);
+
+                setState({ step: "submitting", title: `Step 2 of 3: Funding Milestone ${i + 1}`, sub: "Confirming transaction...", progress: progress2 + 10 });
+                await pollTx(submittedFund.hash);
             }
 
-            // ── STEP 4: Register metadata in backend (with signMessage) ────────────
-            setState({
-                step: "awaiting_signature",
-                title: "Finalizing: Register Metadata",
-                sub: "Sign identity proof for off-chain indexing.",
-                progress: 85
-            });
+            // ── STEP 3: Off-chain metadata ──
+            setState({ step: "awaiting_signature", title: "Step 3 of 3: Indexing", sub: "Awaiting wallet signature...", progress: 80 });
 
-            const timestamp = Date.now();
-            const messageToSign = `Keystone job creation: job=${jobId} client=${publicKey} ts=${timestamp}`;
-            const { signedMessage: signedMsg } = await signMessage(messageToSign, { address: publicKey });
+            const ts = Date.now();
+            const proofMsg = `Keystone job creation: job=${jobId} client=${publicKey} ts=${ts}`;
+            const sigResult = await signMessage(proofMsg, { address: publicKey });
+            if (!sigResult || (typeof sigResult !== "string" && !sigResult.signedMessage)) {
+                throw new Error("User declined to sign");
+            }
+            const sigBytes = typeof sigResult === "string" ? sigResult : sigResult.signedMessage;
+
+            setState({ step: "submitting", title: "Indexing metadata…", sub: "Submitting transaction...", progress: 90 });
 
             await createJobMetadata({
                 jobId,
@@ -205,58 +265,62 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
                 description: jobDescription,
                 clientAddress: publicKey,
                 freelancerAddress: freelancer,
-                milestones: milestones.map(m => ({ title: m.title, description: m.description })),
-                timestamp,
-                signedMessage: signedMsg
+                milestones: milestones.map((m, i) => ({
+                    milestoneIndex: i + 1,
+                    title: m.title,
+                    description: m.description,
+                    amount: parseFloat(m.amount) || 0
+                })),
+                timestamp: ts,
+                signedMessage: sigBytes
             });
 
-            // ── DONE ───────────────────────────────────────────────────────────────
-            setState({
-                step: "confirmed",
-                title: "Contract Deployed",
-                sub: `Job #${jobId} is live on-chain and indexed.`,
-                progress: 100
-            });
-
-            setStep(4); // Show success state
+            dismissToast(toastId);
+            toast.success("Transaction completed.");
+            setState({ step: "confirmed", title: "Contract Deployed", sub: "Transaction completed.", progress: 100 });
+            setDeployed(true);
 
         } catch (e: any) {
-            const msg = e?.message || String(e);
-            setError(msg);
-            setState({
-                step: "error",
-                title: "Deployment Failed",
-                sub: msg,
-                progress: 0,
-                errorLevel: true
-            });
+            console.error("Deploy error details (developer console):", e);
+            dismissToast(toastId);
+            const userMsg = getFriendlyErrorMessage(e);
+
+            if (isUserCancellation(e)) {
+                toast.info(userMsg);
+                setError("Transaction cancelled.");
+                setState({ step: "idle", title: "Awaiting Instructions", sub: "Transaction cancelled.", progress: 0 });
+            } else {
+                setError(userMsg);
+                toast.error(userMsg);
+                setState({ step: "error", title: "Transaction Failed", sub: userMsg, progress: 100, errorLevel: true });
+            }
         } finally {
             setIsLoading(false);
         }
     };
 
-    // ── NOT CONNECTED ──────────────────────────────────────────────────────────
-    if (!publicKey) {
+    // ── SUCCESS STATE ──
+    if (deployed) {
         return (
-            <div className="page-view active" id="view-create">
-                <div style={{ maxWidth: 600, margin: "80px auto", textAlign: "center", padding: "60px 40px", border: "1px solid var(--iron)", background: "var(--alum)" }}>
-                    <p className="cad-label" style={{ marginBottom: 16 }}>Access Restricted</p>
-                    <h2 className="display" style={{ fontSize: 28, marginBottom: 12 }}>Vault Locked</h2>
-                    <p style={{ color: "rgba(22,26,29,0.5)", fontSize: 14 }}>Connect your Freighter wallet to initialize a new structural sequence.</p>
-                </div>
-            </div>
-        );
-    }
-
-    // ── SUCCESS STATE ──────────────────────────────────────────────────────────
-    if (step === 4) {
-        return (
-            <div className="page-view active" id="view-create">
-                <div style={{ maxWidth: 600, margin: "80px auto", textAlign: "center", padding: "60px 40px", border: "1px solid var(--brass)", background: "var(--alum)" }}>
-                    <p className="cad-label" style={{ color: "var(--brass)", marginBottom: 16 }}>Contract Deployed</p>
-                    <h2 className="display" style={{ fontSize: 32, marginBottom: 12 }}>Escrow Live</h2>
-                    <p style={{ color: "rgba(22,26,29,0.6)", fontSize: 14, marginBottom: 32 }}>Your contract has been committed to the Soroban ledger and indexed off-chain.</p>
-                    <button className="btn-massive" onClick={() => { resetTx(); setStep(1); setFreelancer(""); setMilestones([{ title: "", description: "", amount: "" }]); setJobTitle(""); setJobDescription(""); if (setView) setView("dashboard"); }}>
+            <div className="drafting-container">
+                <div className="drafting-board" style={{ textAlign: "center", padding: "80px 48px" }}>
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--banknote)" strokeWidth="2" style={{ marginBottom: 24 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <h2 className="display" style={{ fontSize: 32, marginBottom: 12 }}>Contract Deployed</h2>
+                    <p style={{ color: "rgba(22,26,29,0.5)", marginBottom: 40 }}>
+                        Your escrow has been committed to the Soroban ledger and indexed off-chain.
+                    </p>
+                    <button className="btn-deploy" onClick={() => {
+                        resetTx();
+                        setDeployed(false);
+                        setFreelancer("");
+                        setMilestones([{ title: "", description: "", amount: "" }]);
+                        setJobTitle("");
+                        setJobDescription("");
+                        setErrors({});
+                        if (setView) setView("dashboard");
+                    }}>
                         Return to Dashboard
                     </button>
                 </div>
@@ -264,140 +328,174 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
         );
     }
 
-    // ── MAIN FORM ──────────────────────────────────────────────────────────────
+    // ── MAIN FORM — Drafting Board Design ──
     return (
-        <div className="page-view active" id="view-create" style={{ paddingBottom: 120 }}>
-            <div style={{ maxWidth: 680, margin: "0 auto" }}>
+        <div className="drafting-container">
+            <p className="uppercase" style={{ color: "rgba(22,26,29,0.4)", marginBottom: 20, alignSelf: "flex-start", maxWidth: 800, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
+                Initialize New Contract
+            </p>
 
-                {/* Header */}
-                <div style={{ marginBottom: 48 }}>
-                    <p className="cad-label" style={{ marginBottom: 12 }}>Initialize Contract</p>
-                    <h2 className="display" style={{ fontSize: 36, marginBottom: 8 }}>New Escrow</h2>
-                    <p style={{ color: "rgba(22,26,29,0.5)", fontSize: 14 }}>Deploy a multi-milestone escrow contract to the Stellar Testnet.</p>
+            <div className="drafting-board">
+                <div className="draft-header">
+                    <h2>Contract Foundation</h2>
+                    <p>Define the job parameters and lock in the freelancer before adding milestones.</p>
                 </div>
 
-                {/* Step 1: Parties */}
-                <div style={{ marginBottom: 32 }}>
-                    <div className="cad-header" style={{ marginBottom: 20 }}>
-                        <h3 className="cad-title display">1. Contract Parties</h3>
-                        {step > 1 && <span className="cad-label" style={{ color: "var(--brass)" }}>Locked</span>}
-                    </div>
-
-                    <div style={{ marginBottom: 16 }}>
-                        <label className="cad-label" style={{ display: "block", marginBottom: 8 }}>Your Address (Client)</label>
-                        <div className="mono" style={{ padding: "12px 16px", background: "rgba(22,26,29,0.04)", border: "1px solid var(--glass-border)", fontSize: 13, wordBreak: "break-all" }}>
-                            {publicKey}
-                        </div>
-                    </div>
-
-                    <div style={{ marginBottom: 20 }}>
-                        <label className="cad-label" style={{ display: "block", marginBottom: 8 }}>Freelancer Public Key</label>
+                <div className="draft-body">
+                    {/* Project Title */}
+                    <div className="draft-group">
+                        <label className="draft-label">Project Title</label>
                         <input
                             type="text"
-                            placeholder="G..."
-                            value={freelancer}
-                            onChange={e => setFreelancer(e.target.value)}
-                            disabled={step > 1}
-                            className="mono"
-                            style={{ width: "100%", padding: "12px 16px", border: "1px solid var(--iron)", background: step > 1 ? "rgba(22,26,29,0.04)" : "white", fontSize: 13, outline: "none", boxSizing: "border-box", opacity: step > 1 ? 0.6 : 1 }}
+                            className="draft-input"
+                            placeholder="Landing page redesign"
+                            value={jobTitle}
+                            onChange={e => {
+                                setJobTitle(e.target.value);
+                                const err = validateProjectTitle(e.target.value);
+                                setErrors(prev => ({ ...prev, title: err || "" }));
+                            }}
+                            disabled={isLoading}
+                            style={{ borderColor: errors.title ? "var(--oxide)" : "" }}
                         />
-                        {freelancer && !StrKey.isValidEd25519PublicKey(freelancer) && (
-                            <p style={{ color: "var(--oxide)", fontSize: 12, marginTop: 6 }}>Invalid Stellar public key</p>
+                        {errors.title && <p style={{ color: "var(--oxide)", fontSize: 12, marginTop: 4 }}>{errors.title}</p>}
+                    </div>
+
+                    {/* Project Description */}
+                    <div className="draft-group">
+                        <label className="draft-label">Project Description</label>
+                        <textarea
+                            className="draft-input"
+                            placeholder="Full redesign of the marketing site homepage and pricing page, including mobile layout."
+                            value={jobDescription}
+                            onChange={e => {
+                                setJobDescription(e.target.value);
+                                const err = validateDescription(e.target.value);
+                                setErrors(prev => ({ ...prev, description: err || "" }));
+                            }}
+                            disabled={isLoading}
+                            style={{ borderColor: errors.description ? "var(--oxide)" : "" }}
+                        />
+                        {errors.description && <p style={{ color: "var(--oxide)", fontSize: 12, marginTop: 4 }}>{errors.description}</p>}
+                    </div>
+
+                    {/* Freelancer Address */}
+                    <div className="draft-group">
+                        <label className="draft-label">Freelancer Address</label>
+                        <input
+                            type="text"
+                            className="draft-input mono"
+                            placeholder="GABC7X9K2LFRE4M1PQRS8T2NHIJKLMNOPQRSTUVWXYZ"
+                            value={freelancer}
+                            onChange={e => {
+                                const val = e.target.value;
+                                setFreelancer(val);
+                                let err = "";
+                                if (!val.trim()) {
+                                    err = "Freelancer Address is required.";
+                                } else if (!StrKey.isValidEd25519PublicKey(val)) {
+                                    err = "Invalid Stellar public key.";
+                                }
+                                setErrors(prev => ({ ...prev, freelancer: err }));
+                            }}
+                            disabled={isLoading}
+                            style={{ borderColor: errors.freelancer ? "var(--oxide)" : "" }}
+                        />
+                        {errors.freelancer && (
+                            <p style={{ color: "var(--oxide)", fontSize: 12, marginTop: 4 }}>{errors.freelancer}</p>
                         )}
                     </div>
 
-                    {step === 1 && StrKey.isValidEd25519PublicKey(freelancer) && freelancer !== publicKey && (
-                        <button className="btn-massive" style={{ padding: "12px 32px" }} onClick={() => setStep(2)}>
-                            Lock Parties
-                        </button>
-                    )}
-                </div>
-
-                {/* Step 2: Milestones */}
-                {step >= 2 && (
-                    <div style={{ marginBottom: 32 }}>
-                        <div className="cad-header" style={{ marginBottom: 20 }}>
-                            <h3 className="cad-title display">2. Milestones</h3>
-                            {step > 2 && <span className="cad-label" style={{ color: "var(--brass)" }}>Locked</span>}
-                        </div>
+                    {/* Structural Milestones */}
+                    <div style={{ marginTop: 16 }}>
+                        <label className="draft-label" style={{ marginBottom: 20 }}>Structural Milestones</label>
 
                         {milestones.map((m, i) => (
-                            <div key={i} style={{ border: "1px solid var(--glass-border)", padding: "20px", marginBottom: 12, position: "relative" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                                    <span className="cad-label">Milestone {i + 1}</span>
-                                    {milestones.length > 1 && step === 2 && (
-                                        <button onClick={() => removeMilestone(i)} style={{ fontSize: 11, color: "var(--oxide)", background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>REMOVE</button>
+                            <div key={i} className="milestone-builder-block">
+                                <div className="m-header">
+                                    <span className="m-pill">Milestone {i + 1}</span>
+                                    {milestones.length > 1 && (
+                                        <button className="m-remove" onClick={() => removeMilestone(i)} disabled={isLoading}>
+                                            Remove
+                                        </button>
                                     )}
                                 </div>
-                                <input type="text" placeholder="Title" value={m.title} onChange={e => updateMilestone(i, "title", e.target.value)} disabled={step > 2}
-                                    style={{ width: "100%", marginBottom: 8, padding: "10px 14px", border: "1px solid var(--glass-border)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                                <input type="text" placeholder="Description (optional)" value={m.description} onChange={e => updateMilestone(i, "description", e.target.value)} disabled={step > 2}
-                                    style={{ width: "100%", marginBottom: 8, padding: "10px 14px", border: "1px solid var(--glass-border)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <input type="number" placeholder="0.00" value={m.amount} onChange={e => updateMilestone(i, "amount", e.target.value)} disabled={step > 2}
-                                        className="mono" style={{ flex: 1, padding: "10px 14px", border: "1px solid var(--glass-border)", fontSize: 13, outline: "none" }} />
-                                    <span className="cad-label">XLM</span>
+                                <div className="m-row">
+                                    <div>
+                                        <label className="draft-label" style={{ fontSize: 9, color: "rgba(22,26,29,0.3)" }}>Title</label>
+                                        <input
+                                            type="text"
+                                            className="draft-input"
+                                            placeholder="Wireframes"
+                                            value={m.title}
+                                            onChange={e => {
+                                                updateMilestone(i, "title", e.target.value);
+                                                const err = validateRequiredText(e.target.value, `Milestone ${i + 1} Title`, 3, 100);
+                                                setErrors(prev => ({ ...prev, [`m_${i}_title`]: err || "" }));
+                                            }}
+                                            disabled={isLoading}
+                                            style={{ borderColor: errors[`m_${i}_title`] ? "var(--oxide)" : "" }}
+                                        />
+                                        {errors[`m_${i}_title`] && <p style={{ color: "var(--oxide)", fontSize: 11, marginTop: 4 }}>{errors[`m_${i}_title`]}</p>}
+                                    </div>
+                                    <div className="amount-wrap">
+                                        <div style={{ flex: 1 }}>
+                                            <label className="draft-label" style={{ fontSize: 9, color: "rgba(22,26,29,0.3)" }}>Amount</label>
+                                            <input
+                                                type="text"
+                                                className="draft-input"
+                                                placeholder="150"
+                                                value={m.amount}
+                                                onChange={e => {
+                                                    const cleanVal = e.target.value.replace(/[^0-9.]/g, "");
+                                                    updateMilestone(i, "amount", cleanVal);
+                                                    const err = validateAmount(cleanVal);
+                                                    setErrors(prev => ({ ...prev, [`m_${i}_amount`]: err || "" }));
+                                                }}
+                                                onKeyDown={e => {
+                                                    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Escape", "Enter"].includes(e.key)) return;
+                                                    if (e.key === "e" || e.key === "E" || e.key === "+" || e.key === "-") {
+                                                        e.preventDefault();
+                                                    }
+                                                }}
+                                                disabled={isLoading}
+                                                style={{ borderColor: errors[`m_${i}_amount`] ? "var(--oxide)" : "" }}
+                                            />
+                                            {errors[`m_${i}_amount`] && <p style={{ color: "var(--oxide)", fontSize: 11, marginTop: 4 }}>{errors[`m_${i}_amount`]}</p>}
+                                        </div>
+                                        <span style={{ paddingTop: 20 }}>XLM</span>
+                                    </div>
                                 </div>
                             </div>
                         ))}
 
-                        {step === 2 && (
-                            <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                                <button onClick={addMilestone} style={{ padding: "10px 20px", border: "1px solid var(--iron)", background: "none", fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", cursor: "pointer" }}>
-                                    + ADD MILESTONE
-                                </button>
-                                {allMilestonesValid && (
-                                    <button className="btn-massive" style={{ padding: "10px 28px" }} onClick={() => setStep(3)}>
-                                        Lock Milestones
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Step 3: Metadata + Deploy */}
-                {step >= 3 && (
-                    <div style={{ marginBottom: 32 }}>
-                        <div className="cad-header" style={{ marginBottom: 20 }}>
-                            <h3 className="cad-title display">3. Job Metadata</h3>
-                        </div>
-
-                        <input type="text" placeholder="Job Title" value={jobTitle} onChange={e => setJobTitle(e.target.value)} disabled={isLoading}
-                            style={{ width: "100%", marginBottom: 12, padding: "12px 16px", border: "1px solid var(--iron)", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
-                        <textarea placeholder="Description" value={jobDescription} onChange={e => setJobDescription(e.target.value)} disabled={isLoading} rows={3}
-                            style={{ width: "100%", marginBottom: 20, padding: "12px 16px", border: "1px solid var(--iron)", fontSize: 14, outline: "none", resize: "vertical", boxSizing: "border-box" }} />
-
-                        {error && (
-                            <div style={{ padding: "12px 16px", background: "rgba(164,76,39,0.08)", border: "1px solid var(--oxide)", marginBottom: 16, fontSize: 13, color: "var(--oxide)" }}>
-                                {error}
-                            </div>
-                        )}
-
-                        <div style={{ padding: "20px", border: "1px solid var(--glass-border)", background: "rgba(22,26,29,0.02)", marginBottom: 24 }}>
-                            <p className="cad-label" style={{ marginBottom: 12 }}>Deployment Summary</p>
-                            <p style={{ fontSize: 13, marginBottom: 4 }}>Freelancer: <span className="mono">{freelancer.slice(0, 8)}…{freelancer.slice(-8)}</span></p>
-                            <p style={{ fontSize: 13, marginBottom: 4 }}>Milestones: {milestones.length}</p>
-                            <p style={{ fontSize: 13 }}>
-                                Total: <span className="mono">{milestones.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0).toFixed(2)} XLM</span>
-                            </p>
-                        </div>
-
-                        <p style={{ fontSize: 12, color: "rgba(22,26,29,0.5)", marginBottom: 20 }}>
-                            Freighter will prompt {1 + milestones.length + milestones.length + 1} times total: once to create the job, once per milestone to add, once per milestone to fund, and once to sign an identity proof for off-chain indexing.
-                        </p>
-
-                        <button
-                            className="btn-massive"
-                            style={{ width: "100%", padding: "18px", fontSize: 16, opacity: isLoading ? 0.6 : 1, cursor: isLoading ? "not-allowed" : "pointer" }}
-                            onClick={handleDeploy}
-                            disabled={isLoading || !jobTitle.trim()}
-                        >
-                            {isLoading ? "Deploying…" : "Deploy Contract"}
+                        <button className="btn-add-milestone" onClick={addMilestone} disabled={isLoading}>
+                            + Add Milestone
                         </button>
                     </div>
-                )}
+                </div>
+
+                {/* Footer */}
+                <div className="draft-footer">
+                    <div className="draft-summary">
+                        {milestones.length} milestone{milestones.length !== 1 ? "s" : ""} · <strong>{totalXlm.toFixed(0)} XLM</strong> total · {1 + milestones.length * 2 + 1} signatures required
+                    </div>
+                    <button
+                        className="btn-deploy"
+                        onClick={handleDeploy}
+                        disabled={isLoading || !canDeploy}
+                        style={{ opacity: (isLoading || !canDeploy) ? 0.5 : 1, cursor: (isLoading || !canDeploy) ? "not-allowed" : "pointer" }}
+                    >
+                        {isLoading ? "Deploying…" : "Deploy Contract"}
+                    </button>
+                </div>
             </div>
+
+            {error && (
+                <div style={{ maxWidth: 800, margin: "16px auto 0", padding: "12px 16px", background: "rgba(164,76,39,0.08)", border: "1px solid var(--oxide)", borderRadius: 6, fontSize: 13, color: "var(--oxide)" }}>
+                    {error}
+                </div>
+            )}
         </div>
     );
 }

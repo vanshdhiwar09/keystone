@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "../context/WalletContext";
 import { TransactionProvider } from "../context/TransactionContext";
+import { ToastProvider } from "../context/ToastContext";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -37,11 +38,13 @@ export default function RootLayout({
     <html lang="en" className={`${bricolage.variable} ${dmSans.variable} ${dmMono.variable}`}>
       <body>
         <WalletProvider>
-          <TransactionProvider>
-            <div className="layout-wrapper">
-              {children}
-            </div>
-          </TransactionProvider>
+          <ToastProvider>
+            <TransactionProvider>
+              <div className="layout-wrapper">
+                {children}
+              </div>
+            </TransactionProvider>
+          </ToastProvider>
         </WalletProvider>
       </body>
     </html>

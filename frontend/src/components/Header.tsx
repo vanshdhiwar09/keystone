@@ -7,14 +7,6 @@ export default function Header() {
 
     const truncateAddress = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
-    const renderWalletText = () => {
-        if (installed === "loading") return "Loading...";
-        if (installed === "error") return "Fault";
-        if (installed === false) return "Install Freighter";
-        if (!publicKey) return "Connect Wallet";
-        return truncateAddress(publicKey);
-    };
-
     const handleClick = () => {
         if (installed === false) {
             window.open("https://www.freighter.app/", "_blank");
@@ -35,10 +27,18 @@ export default function Header() {
                 <h1 className="display">Keystone</h1>
             </div>
 
-            <div className="wallet-pill" onClick={handleClick}>
-                <div className="status-dot" style={{ background: publicKey ? "var(--banknote)" : "var(--oxide)", boxShadow: publicKey ? "0 0 12px var(--banknote)" : "none" }}></div>
-                <span className="wallet-address mono">{renderWalletText()}</span>
-                <span className="network-badge">{network || "TESTNET"}</span>
+            <div className="status-vault">
+                <span className="network-tag uppercase">
+                    {network || "Testnet"} Active
+                </span>
+                <div className="wallet-id mono" onClick={handleClick} style={{ cursor: "pointer" }}>
+                    {publicKey
+                        ? truncateAddress(publicKey)
+                        : installed === false
+                            ? "Install Freighter"
+                            : "Connect Wallet"
+                    }
+                </div>
             </div>
         </header>
     );

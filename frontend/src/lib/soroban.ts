@@ -3,6 +3,7 @@ import {
     Networks,
     Contract,
     TransactionBuilder,
+    Account,
     xdr,
     Address,
     nativeToScVal,
@@ -12,6 +13,104 @@ import {
 export const NETWORK_PASSPHRASE = Networks.TESTNET;
 export const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://soroban-testnet.stellar.org";
 export const server = new rpc.Server(RPC_URL);
+
+// Helper to identify temporary/transient errors
+function isTransientError(err: any): boolean {
+    if (!err) return false;
+    const msg = String(err.message || err.error || err || "").toLowerCase();
+
+    if (
+        msg.includes("failed to fetch") ||
+        msg.includes("network error") ||
+        msg.includes("timeout") ||
+        msg.includes("request failed") ||
+        msg.includes("rate limit") ||
+        msg.includes("too many requests") ||
+        msg.includes("429") ||
+        msg.includes("502") ||
+        msg.includes("503") ||
+        msg.includes("504") ||
+        msg.includes("cors") ||
+        msg.includes("networkerror")
+    ) {
+        return true;
+    }
+
+    const status = err.status || (err.response && err.response.status);
+    if (status === 429 || status === 502 || status === 503 || status === 504) {
+        return true;
+    }
+
+    return false;
+}
+
+// Global retry helper with exponential backoff
+async function withRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3): Promise<T> {
+    let attempt = 0;
+    while (attempt < maxAttempts) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            attempt++;
+            const isTransient = isTransientError(error) || String(error.message || error).toLowerCase().includes("account not found");
+
+            if (isTransient && attempt < maxAttempts) {
+                const delay = Math.pow(2, attempt) * 500;
+                if (
+                    (typeof process !== "undefined" && process.env?.NODE_ENV === "development") ||
+                    (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+                ) {
+                    console.warn(`[RPC Retry ${attempt}/${maxAttempts}] ${label} failed with transient error: "${error.message || error}". Retrying in ${delay}ms...`);
+                }
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error(`${label} failed after maximum retry attempts.`);
+}
+
+// Override server calls globally to add intercepting transient retries
+const originalGetAccount = server.getAccount.bind(server);
+server.getAccount = async function (address: string) {
+    return await withRetry(
+        () => originalGetAccount(address),
+        `getAccount(${address})`
+    );
+};
+
+const originalSimulateTransaction = server.simulateTransaction.bind(server);
+server.simulateTransaction = async function (tx: any) {
+    return await withRetry(
+        () => originalSimulateTransaction(tx),
+        "simulateTransaction"
+    );
+};
+
+const originalPrepareTransaction = server.prepareTransaction.bind(server);
+server.prepareTransaction = async function (tx: any) {
+    return await withRetry(
+        () => originalPrepareTransaction(tx),
+        "prepareTransaction"
+    );
+};
+
+const originalSendTransaction = server.sendTransaction.bind(server);
+server.sendTransaction = async function (tx: any) {
+    return await withRetry(
+        () => originalSendTransaction(tx),
+        "sendTransaction"
+    );
+};
+
+const originalGetTransaction = server.getTransaction.bind(server);
+server.getTransaction = async function (hash: string) {
+    return await withRetry(
+        () => originalGetTransaction(hash),
+        `getTransaction(${hash})`
+    );
+};
 
 export const ESCROW_CONTRACT_ID = (process.env.NEXT_PUBLIC_ESCROW_ID || "").trim();
 export const FEE_ROUTER_CONTRACT_ID = (process.env.NEXT_PUBLIC_FEE_ROUTER_ID || "").trim();
@@ -177,47 +276,95 @@ export async function txResolveDispute(callerPubKey: string, jobId: number, mile
     );
 }
 
+const inFlightJobQueries = new Map<string, Promise<any>>();
+const inFlightMilestoneQueries = new Map<string, Promise<any>>();
+
 export async function fetchJobData(jobId: number, sourcePublicKey: string) {
-    try {
-        const account = await server.getAccount(sourcePublicKey);
-        const tx = new TransactionBuilder(account, { fee: "100", networkPassphrase: NETWORK_PASSPHRASE })
-            .addOperation(new Contract(ESCROW_CONTRACT_ID).call("get_job", xdr.ScVal.scvU32(jobId)))
-            .setTimeout(30)
-            .build();
-
-        const sim = await server.simulateTransaction(tx);
-        if (!rpc.Api.isSimulationSuccess(sim) || !sim.result || !sim.result.retval) return null;
-
-        return scValToNative(sim.result.retval);
-    } catch (e) {
-        console.error("Soroban RPC Job Query Failed:", e);
-        return null;
+    const key = `${jobId}-${sourcePublicKey}`;
+    if (inFlightJobQueries.has(key)) {
+        return inFlightJobQueries.get(key);
     }
+
+    const promise = (async () => {
+        try {
+            // Read-only query builds Account directly
+            const account = new Account(sourcePublicKey, "0");
+            const tx = new TransactionBuilder(account, { fee: "100", networkPassphrase: NETWORK_PASSPHRASE })
+                .addOperation(new Contract(ESCROW_CONTRACT_ID).call("get_job", xdr.ScVal.scvU32(jobId)))
+                .setTimeout(30)
+                .build();
+
+            const sim = await server.simulateTransaction(tx);
+            if (!rpc.Api.isSimulationSuccess(sim) || !sim.result || !sim.result.retval) return null;
+
+            const job = scValToNative(sim.result.retval);
+            if (!job) return null;
+
+            const count = Number(job.milestone_count ?? 0);
+            const promises = [];
+            for (let i = 1; i <= count; i++) {
+                promises.push(fetchMilestoneData(jobId, i, sourcePublicKey));
+            }
+            const milestones = await Promise.all(promises);
+
+            return {
+                ...job,
+                milestones
+            };
+        } catch (e) {
+            console.error("Soroban RPC Job Query Failed:", e);
+            return null;
+        } finally {
+            inFlightJobQueries.delete(key);
+        }
+    })();
+
+    inFlightJobQueries.set(key, promise);
+    return promise;
 }
 
 export async function fetchMilestoneData(jobId: number, milestoneId: number, sourcePublicKey: string) {
-    try {
-        const account = await server.getAccount(sourcePublicKey);
-        const tx = new TransactionBuilder(account, { fee: "100", networkPassphrase: NETWORK_PASSPHRASE })
-            .addOperation(new Contract(ESCROW_CONTRACT_ID).call("get_milestone", xdr.ScVal.scvU32(jobId), xdr.ScVal.scvU32(milestoneId)))
-            .setTimeout(30)
-            .build();
-
-        const sim = await server.simulateTransaction(tx);
-        if (!rpc.Api.isSimulationSuccess(sim) || !sim.result || !sim.result.retval) return null;
-
-        return scValToNative(sim.result.retval);
-    } catch (e) {
-        console.error("Soroban RPC Milestone Query Failed:", e);
-        return null;
+    const key = `${jobId}-${milestoneId}-${sourcePublicKey}`;
+    if (inFlightMilestoneQueries.has(key)) {
+        return inFlightMilestoneQueries.get(key);
     }
+
+    const promise = (async () => {
+        try {
+            const account = new Account(sourcePublicKey, "0");
+            const tx = new TransactionBuilder(account, { fee: "100", networkPassphrase: NETWORK_PASSPHRASE })
+                .addOperation(new Contract(ESCROW_CONTRACT_ID).call("get_milestone", xdr.ScVal.scvU32(jobId), xdr.ScVal.scvU32(milestoneId)))
+                .setTimeout(30)
+                .build();
+
+            const sim = await server.simulateTransaction(tx);
+            if (!rpc.Api.isSimulationSuccess(sim) || !sim.result || !sim.result.retval) return null;
+
+            return scValToNative(sim.result.retval);
+        } catch (e) {
+            console.error("Soroban RPC Milestone Query Failed:", e);
+            return null;
+        } finally {
+            inFlightMilestoneQueries.delete(key);
+        }
+    })();
+
+    inFlightMilestoneQueries.set(key, promise);
+    return promise;
 }
 
 export async function pollTx(hash: string, maxAttempts = 10): Promise<any> {
     for (let i = 0; i < maxAttempts; i++) {
-        const tx = await server.getTransaction(hash);
-        if (tx.status === "SUCCESS") return tx;
-        if (tx.status === "FAILED") throw new Error("Transaction execution failed on the ledger.");
+        try {
+            const tx = await server.getTransaction(hash);
+            if (tx.status === "SUCCESS") return tx;
+            if (tx.status === "FAILED") throw new Error("Transaction execution failed on the ledger.");
+        } catch (e: any) {
+            if (e.message && e.message.includes("failed on the ledger")) {
+                throw e;
+            }
+            if (i === maxAttempts - 1) throw e;
+        }
         await new Promise(r => setTimeout(r, 2000));
     }
     throw new Error("Transaction polling timed out continuously.");

@@ -8,14 +8,15 @@ interface DockProps {
 export default function NavigationDock({ activeView, setActiveView }: DockProps) {
     const tabs = [
         { id: "dashboard", label: "Dashboard" },
-        { id: "blueprint", label: "Explorer" },
-        { id: "create", label: "New Contract" },
+        { id: "blueprint", label: "Blueprint" },
+        { id: "create", label: "Create" },
         { id: "tx", label: "Terminal" },
-        { id: "feed", label: "Activity" },
+        { id: "feed", label: "Pulse" },
+        { id: "disputes", label: "Disputes" },
     ];
 
     return (
-        <div className="floating-dock">
+        <nav className="floating-dock">
             {tabs.map(tab => (
                 <button
                     key={tab.id}
@@ -25,6 +26,6 @@ export default function NavigationDock({ activeView, setActiveView }: DockProps)
                     {tab.label}
                 </button>
             ))}
-        </div>
+        </nav>
     );
 }

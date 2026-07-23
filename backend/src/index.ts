@@ -13,7 +13,7 @@ const port = process.env.PORT || 4000;
 // Enable strict CORS specifically bound to the exact origin footprint
 app.use(cors({
     origin: ["http://localhost:3000"], // NOTE: Update this physically post-Vercel deploy!
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST", "PUT"]
 }));
 app.use(express.json());
 
@@ -34,10 +34,10 @@ const stellarServer = new rpc.Server(RPC_URL);
  */
 async function fetchJobOnChain(jobId: number) {
     try {
-        // Explictly defined unassociated simulation account to execute read-only Contract pulls.
-        // This offline placeholder skips `getAccount` lookup lag safely without overlapping any active keys.
-        const DUMMY_SIMULATION_ACCOUNT = "GA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZCV3CQ3A3KHEU3Q5C7KZ3K5TMF2";
-        const account = new Account(DUMMY_SIMULATION_ACCOUNT, "0");
+        // Use Arbiter's real address as the simulation source — it's always funded on testnet.
+        // For simulation (read-only), the account doesn't need to broadcast; it just needs a valid key.
+        const ARBITER_ADDRESS = "GC66O7ANIHELSXEAJFF7ES7OMCSYQCMBJT4TESQTNSYJGF4KTP2XET2M";
+        const account = new Account(ARBITER_ADDRESS, "0");
         const tx = new TransactionBuilder(account, { fee: "100", networkPassphrase: NETWORK_PASSPHRASE })
             .addOperation(new Contract(ESCROW_CONTRACT_ID).call("get_job", xdr.ScVal.scvU32(jobId)))
             .setTimeout(30)
@@ -90,7 +90,15 @@ app.post("/api/jobs", async (req, res) => {
             return res.status(400).json({ error: "Invalid generic cryptographic type resolved physically." });
         }
 
-        const isValid = keypair.verify(Buffer.from(expectedMessage), sigBuffer);
+        // 4. SEP-53 compliant verification — Freighter signs SHA256("Stellar Signed Message:\n" + message)
+        //    NOT raw message bytes. Must replicate the same hash before verifying.
+        const crypto = require('crypto');
+        const sep53Prefix = Buffer.from('Stellar Signed Message:\n', 'utf8');
+        const msgBytes = Buffer.from(expectedMessage, 'utf8');
+        const prefixedPayload = Buffer.concat([sep53Prefix, msgBytes]);
+        const hashToVerify = crypto.createHash('sha256').update(prefixedPayload).digest();
+
+        const isValid = keypair.verify(hashToVerify, sigBuffer);
 
         if (!isValid) {
             return res.status(401).json({ error: "Signature validation bounds rejected payload natively." });
@@ -143,6 +151,32 @@ app.post("/api/jobs", async (req, res) => {
     }
 });
 
+app.put("/api/milestones/dispute", async (req, res) => {
+    try {
+        const { jobId, milestoneIndex, disputeTitle, disputeDescription, disputeNotes } = req.body;
+        if (!jobId || !milestoneIndex) {
+            return res.status(400).json({ error: "Missing required parameters." });
+        }
+
+        const { data, error } = await supabase
+            .from("milestones")
+            .update({
+                dispute_title: disputeTitle,
+                dispute_description: disputeDescription,
+                dispute_notes: disputeNotes
+            })
+            .eq("job_id", jobId)
+            .eq("milestone_index", milestoneIndex)
+            .select();
+
+        if (error) throw error;
+        return res.json({ success: true, data });
+    } catch (e: any) {
+        console.error("PUT /api/milestones/dispute execution error:", e);
+        return res.status(500).json({ error: "Failed to update dispute metadata", details: e.message });
+    }
+});
+
 app.get("/api/jobs", async (req, res) => {
     try {
         const term = req.query.search as string;
@@ -157,7 +191,7 @@ app.get("/api/jobs", async (req, res) => {
                 clientAddress:client_address,
                 freelancerAddress:freelancer_address,
                 createdAt:created_at,
-                milestones ( id, milestoneIndex:milestone_index, title, description, amount )
+                milestones ( id, milestoneIndex:milestone_index, title, description, amount, disputeTitle:dispute_title, disputeDescription:dispute_description, disputeNotes:dispute_notes )
             `)
             .order('created_at', { ascending: false });
 
