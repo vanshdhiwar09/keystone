@@ -25,10 +25,9 @@ Clients lock transaction capital per milestone in secure smart contracts; freela
 
 ## 🚀 Live Demo
 
-- **Live Application**: `<FRONTEND_URL>`
-- **Backend API**: `<BACKEND_URL>`
-- **Demo Video (1-2 min)**: `<DEMO_VIDEO_LINK>`
-- **Presentation Deck**: `<PRESENTATION_LINK>`
+- **Live Application**: [https://keystone-vansh09.vercel.app](https://keystone-vansh09.vercel.app)
+- **Backend API**: [https://keystone-backend-z0n3.onrender.com](https://keystone-backend-z0n3.onrender.com)
+- **Demo Video**: [Google Drive Link](https://drive.google.com/file/d/1Mzw5vDXhR7-7CEayO0Bk_8JaRzw8mDpZ/view?usp=sharing)
 
 ### Stellar Expert Testnet Contracts
 - 📄 [Escrow Contract Explorer](https://stellar.expert/explorer/testnet/contract/CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC)
