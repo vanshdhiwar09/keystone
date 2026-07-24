@@ -134,7 +134,7 @@ stateDiagram-v2
 ![Desktop Dashboard](testscreenshot/desktop-dashboard.png)
 
 #### 📱 Mobile Dashboard view
-![Mobile Dashboard](testscreenshot/mobile-dashboard.jpeg)
+<img src="testscreenshot/mobile-dashboard.jpeg" width="350" alt="Mobile Dashboard" />
 
 #### ➕ Create Agreement Flow
 ![Create Agreement](testscreenshot/create-agreement.png)
