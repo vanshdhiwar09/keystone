@@ -311,29 +311,57 @@ npm run dev
 ## 🚀 Deployment
 
 ### Frontend (Vercel)
-The web wrapper is configured for zero-overhead Vercel deployments:
-1. Link your repository in Vercel dashboard.
-2. Select **Next.js** framework preset.
-3. Import the `frontend` folder path.
-4. Input all `NEXT_PUBLIC_*` environment parameters.
-5. Deploy.
+- **Production URL**: `https://keystone-escrow.vercel.app`
+- **Framework Preset**: Next.js (inside `/frontend` directory)
+- **Install & Build Settings**: 
+  - Build Command: `npm run build`
+  - Install Command: `npm install`
+- **Environment Variables (Production + Preview)**:
+  Set these variables in your Vercel project configuration console:
+  ```env
+  NEXT_PUBLIC_ESCROW_ID=CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC
+  NEXT_PUBLIC_FEE_ROUTER_ID=CBYVRXSCGOIMIN746C77BYEV2QKNVP6RA4JC5TTHED4JX7C6SQQ6SZ47
+  NEXT_PUBLIC_PAYOUT_ID=CCD5UJQEE2K7M3CATACJ5QOUZTW6V2EX54QKNROIRD423HL6OKFX5ZHA
+  NEXT_PUBLIC_TOKEN_ID=CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+  NEXT_PUBLIC_ARBITER_ID=GC66O7ANIHELSXEAJFF7ES7OMCSYQCMBJT4TESQTNSYJGF4KTP2XET2M
+  NEXT_PUBLIC_NETWORK=testnet
+  NEXT_PUBLIC_RPC_URL=https://soroban-testnet.stellar.org
+  NEXT_PUBLIC_BACKEND_URL=https://keystone-backend.onrender.com
+  ```
+  *(Note: All `NEXT_PUBLIC_*` environment variables must be defined at project build time to be bundled into the compiled frontend app's bundle.)*
 
 ### Backend (Render / Railway)
-The backend index is packaged for server deployments:
-1. Connect repository codebase to your chosen container service.
-2. Configure build script: `cd backend && npm install && npm run build`.
-3. Start command: `node backend/dist/index.js`.
-4. Configure database variables in application context.
+- **Production URL**: `https://keystone-backend.onrender.com`
+- **Runtime Environment**: Node.js 20+
+- **Build & Application Settings**:
+  - Build Command: `cd backend && npm install && npm run build`
+  - Start Command: `node backend/dist/index.js`
+- **Environment Variables**:
+  Configure these environment variables in your server provider console:
+  ```env
+  PORT=4000
+  SUPABASE_URL=https://your-project.supabase.co
+  SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-key
+  RPC_URL=https://soroban-testnet.stellar.org
+  NETWORK_PASSPHRASE=Testnet Global Stellar Network ; October 2025
+  ESCROW_CONTRACT_ID=CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC
+  FRONTEND_URL=https://keystone-escrow.vercel.app
+  ```
+  *(Note: The `FRONTEND_URL` is parsed by the Express server dynamically to apply secure CORS preflight headers allowing origin connections.)*
 
 ### Contracts (Stellar Testnet)
-The contracts are pre-deployed at the addresses logged above. To re-compile and redeploy:
-```bash
-cd contracts
-stellar contract build
-cd ../scripts
-./deploy.ps1
-```
-*Always ensure the resulting hashes are updated in both `.env` configurations.*
+Contract hashes are pre-deployed at the addresses documented above. To rebuild and deploy fresh contract codes:
+1. Re-compile targeting wasm runtime:
+   ```bash
+   cd contracts
+   stellar contract build
+   ```
+2. Execute the pre-configured deployment flow:
+   ```bash
+   cd ../scripts
+   ./deploy.ps1
+   ```
+3. Update both `frontend/.env.local` and `backend/.env` with the new output contract ID hashes.
 
 ---
 
