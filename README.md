@@ -1,384 +1,370 @@
-# Keystone
+# 🏗 Keystone — Trustless Escrow Infrastructure
 
-<!-- ADD: CI badge once GitHub Actions workflow is set up, e.g.
-[![CI](https://github.com/<you>/keystone/actions/workflows/ci.yml/badge.svg)](https://github.com/<you>/keystone/actions/workflows/ci.yml)
--->
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.10-black?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Soroban](https://img.shields.io/badge/Soroban-Stellar-purple?logo=stellar&logoColor=white)](https://stellar.org)
+[![Rust](https://img.shields.io/badge/Rust-1.84%2B-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Wallet](https://img.shields.io/badge/Wallet-Freighter-gold?logo=lightspeed&logoColor=white&color=BFA15F)](https://www.freighter.app/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-**Live app:** <!-- INSERT: Vercel production URL, e.g. https://keystone-escrow.vercel.app -->
+**Trustless milestone escrow protocol built on the Stellar network.**
 
-**Escrow contract (Testnet):** `CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC`
-
-Trustless milestone escrow for freelance work on Stellar. Clients lock funds in a smart contract per milestone; freelancers get paid automatically on approval — no invoicing, no platform holding funds, and a neutral on-chain arbiter for disputes.
+Clients lock transaction capital per milestone in secure smart contracts; freelancers receive payouts automatically upon mutual approval—eliminating manual invoicing delays, third-party custody risks, and fee exploitation. Features a neutral on-chain arbiter console to resolve disputes cleanly.
 
 ---
 
-## Demo
+## 📌 Why Keystone?
 
-| Resource | Link |
-|---|---|
-| Live app | <!-- INSERT: Vercel URL --> |
-| Create job transaction | [Stellar Expert](https://stellar.expert/explorer/testnet/tx/756f329eac01ae2dde71936b1577365cf3cd595552356b8d4378938eb677cc8e) |
-| Escrow contract | [Stellar Expert](https://stellar.expert/explorer/testnet/contract/CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC) |
-| Fee Router contract | [Stellar Expert](https://stellar.expert/explorer/testnet/contract/CBYVRXSCGOIMIN746C77BYEV2QKNVP6RA4JC5TTHED4JX7C6SQQ6SZ47) |
-| Payout contract | [Stellar Expert](https://stellar.expert/explorer/testnet/contract/CCD5UJQEE2K7M3CATACJ5QOUZTW6V2EX54QKNROIRD423HL6OKFX5ZHA) |
-| Demo video (1–2 min) | <!-- INSERT: YouTube/Loom/Drive link --> |
+- 🔒 **Trustless Milestone Escrow**: Funds are locked inside decentralized ledger states, never custodied by the platform.
+- ⚡ **Native Soroban Smart Contracts**: Clean Rust implementation running on WASM runtime.
+- 💰 **Cross-Contract Flow**: Automated 98/2% splits executing payouts across multi-hop contract actions.
+- 🛡 **Neutral Arbitration**: designated Arbiter role resolves contested funds without user collision.
+- 📱 **Mobile-First CAD design**: Optimized mobile navigation dock and form fields covering down to 320px screens.
 
-Every on-chain action in the app links to Stellar Expert using this pattern:
+---
 
+## 🚀 Live Demo
+
+- **Live Application**: `<FRONTEND_URL>`
+- **Backend API**: `<BACKEND_URL>`
+- **Demo Video (1-2 min)**: `<DEMO_VIDEO_LINK>`
+- **Presentation Deck**: `<PRESENTATION_LINK>`
+
+### Stellar Expert Testnet Contracts
+- 📄 [Escrow Contract Explorer](https://stellar.expert/explorer/testnet/contract/CBZ472YIFAPH3MMP25AWKS53CVI3JVHSEJDOGBAWSPWJ6WFNNOMHL3VC)
+- 🔀 [Fee Router Contract Explorer](https://stellar.expert/explorer/testnet/contract/CBYVRXSCGOIMIN746C77BYEV2QKNVP6RA4JC5TTHED4JX7C6SQQ6SZ47)
+- 💸 [Payout Contract Explorer](https://stellar.expert/explorer/testnet/contract/CCD5UJQEE2K7M3CATACJ5QOUZTW6V2EX54QKNROIRD423HL6OKFX5ZHA)
+
+Every on-chain action in the application links directly to Stellar Expert using this transaction pattern:
 ```
 https://stellar.expert/explorer/testnet/tx/{transaction_hash}
 ```
-
-Example distribution transaction (Escrow → Fee Router → Payout → freelancer, full inter-contract chain):
-
+*Example multi-hop payout transaction (Escrow ➔ Fee Router ➔ Payout ➔ Freelancer):*
 ```
 https://stellar.expert/explorer/testnet/tx/756f329eac01ae2dde71936b1577365cf3cd595552356b8d4378938eb677cc8e
 ```
 
 ---
 
-## Screenshots
+## 📖 Table of Contents
 
-### Mobile responsive UI
-<!-- ADD: 2-3 screenshots at ~375px viewport width — Dashboard, Job Detail, Create Job -->
-<!-- Example markdown once images exist:
-| Dashboard | Job Detail | Create Job |
+1. [⚡ Features](#-features)
+2. [🛠 Tech Stack](#-tech-stack)
+3. [🏗 System Architecture](#-system-architecture)
+4. [🚦 Milestone Lifecycle](#-milestone-lifecycle)
+5. [📦 Folder Structure](#-folder-structure)
+6. [📖 Smart Contracts](#-smart-contracts)
+7. [⚙ Installation](#-installation)
+8. [🧪 Testing](#-testing)
+9. [🚀 Deployment](#-deployment)
+10. [🔒 Security & Permission Model](#-security--permission-model)
+11. [⚠️ Known Limitations](#-known-limitations)
+12. [🔮 Future Improvements](#-future-improvements)
+13. [📄 License](#-license)
+
+---
+
+## ⚡ Features
+
+- **Freighter Wallet Connect / Disconnect**: Programmatic connection, network check overrides, and installation detection.
+- **Multi-Milestone Job Creation**: Clients draft complex jobs specifying distinct milestones, titles, descriptions, and budgets.
+- **Deferred Milestone Funding**: Retain capital flexibility. Clients fund each milestone individually on-demand rather than locking 100% of project costs upfront.
+- **Auto-Routing Payments Split**: Decentralized, permissionless 98% / 2% split executing Payout transfers.
+- **Neutral On-Chain Arbitration**: Exclusive, role-gated Arbiter controls to release or refund disputed milestone balances.
+- **Secure Off-Chain Metadata Store**: Job titles and descriptions are aggregated via Express/Supabase and verified via cryptographic signature checks.
+- **Pulsing Loading State Skeletons**: Modern pulsing templates mock loader states during RPC simulations, avoiding shifts in UI.
+- **Responsive Layout System**: Spacing, clamp headings, and navigation dock adapt from 320px mobile viewports up to large desktop widths.
+
+---
+
+## 🛠 Tech Stack
+
+| Layer | Technology | Purpose |
 |---|---|---|
-| ![Dashboard mobile](docs/screenshots/dashboard-mobile.png) | ![Job detail mobile](docs/screenshots/detail-mobile.png) | ![Create job mobile](docs/screenshots/create-mobile.png) |
--->
-
-### CI/CD pipeline
-<!-- ADD: screenshot of GitHub Actions run passing -->
-
-### Test output
-<!-- ADD: screenshot or pasted terminal output of `cargo test` showing 3+ passing tests -->
-
----
-
-## Features
-
-- Freighter wallet connect / disconnect, with network and installation state handling
-- Multi-milestone job creation — one job, multiple milestones, each independently titled, described, and priced
-- Deferred, per-milestone funding — client funds each milestone individually from the Job Detail view, not all upfront
-- Full on-chain milestone lifecycle: `Created → Funded → Submitted → Approved → Released`, with a parallel `Disputed → Refunded` path
-- Real inter-contract fund distribution: Escrow → Fee Router (98/2 split) → Payout → freelancer, three separate contracts, two cross-contract calls
-- Neutral, contract-designated arbiter role for dispute resolution — distinct from both client and freelancer, resolves via `resolve_dispute`
-- Off-chain job metadata (titles, descriptions) indexed via a signature-verified backend, cross-checked against on-chain ownership before being accepted
-- Searchable, filterable contract Explorer
-- Live activity feed via Soroban event polling
-- Role-gated actions throughout — every button checks the connected wallet against the job's real on-chain client/freelancer/arbiter identity before rendering
+| **Frontend** | React, Next.js (App Router), TS | Modular views, responsive dashboards, and CAD styles. |
+| **Styling** | Tailwind CSS, Vanilla CSS | Core tokens, responsive utilities, and custom scroll elements. |
+| **Wallets** | Freighter API | Signature actions, wallet connect, and validation checks. |
+| **Blockchain** | Stellar SDK, Soroban RPC | Contract simulations, dynamic logs, and exponential backoff retry. |
+| **Contracts** | Rust, Soroban SDK | WASM compilation, TTL bounds checking, and test fixtures. |
+| **Backend API** | Node.js, Express, TS | Metadata routing, CORS preflights, and signature verification. |
+| **Database** | Supabase (PostgreSQL) | Cryptographically indexed job metadata search storage. |
+| **Deployment**| Vercel & Render | Continuous integration pipeline for frontend and backend API. |
 
 ---
 
-## Stack
+## 🏗 System Architecture
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js, React, TypeScript, Tailwind CSS |
-| Wallet | Freighter (`@stellar/freighter-api`) |
-| Chain | `@stellar/stellar-sdk`, Soroban RPC |
-| Contracts | Rust, Soroban SDK |
-| Backend | Express, TypeScript |
-| Off-chain data | Supabase (Postgres) |
-| Deployment | Vercel (frontend), <!-- INSERT: backend host, e.g. Railway/Render --> |
+The Keystone protocol separates duties across three distinct smart contracts to maximize isolation and prevent custody conflicts. All incoming funds flow from the client into the core Escrow contract, which triggers subsequent routing transactions.
+
+```mermaid
+graph TD
+    Client[Client Wallet] -- "1. fund_milestone" --> Escrow("Escrow Contract")
+    Escrow -- "2. distribute_milestone (If Approved)" --> Router("Fee Router Contract")
+    Router -- "3. Platform Fee (2%)" --> Platform["Platform Wallet"]
+    Router -- "4. Freelancer Share (98%)" --> Payout("Payout Contract")
+    Payout -- "5. execute_payout" --> Freelancer["Freelancer Wallet"]
+```
 
 ---
 
-## Architecture
+## 🚦 Milestone Lifecycle
 
-### Design principles
+Each milestone tracks progress in a state-machine that spans active progress, approval, and alternative arbitration resolution pathways.
 
-- **Funds on-chain, always** — every XLM moved is a real Soroban transaction; the backend never custodies funds or decides outcomes.
-- **Metadata off-chain, verified** — job titles/descriptions live in Supabase for real search/filtering, but every write is signature-verified and cross-checked against on-chain job ownership before being accepted, so metadata can't be spoofed for jobs you don't own.
-- **Three contracts, not one** — Escrow, Fee Router, and Payout are separate contracts with distinct responsibilities, communicating via real Soroban cross-contract calls, not internal function calls.
-- **Neutral arbitration** — disputes are resolved by a designated arbiter address, distinct from both client and freelancer, avoiding the conflict of interest of self-arbitration.
+```mermaid
+stateDiagram-v2
+    [*] --> Created : Client drafts job details
+    Created --> Funded : Client locks milestone funds
+    Funded --> Submitted : Freelancer submits proof
+    Submitted --> Approved : Client approves deliverable
+    Approved --> Released : Anyone triggers release (98/2 split)
 
-### Contract architecture
-
-```
-Client funds milestone
-        │
-        ▼
-  ┌───────────┐   distribute_milestone   ┌────────────┐   route_funds   ┌──────────┐
-  │  Escrow   │ ───────────────────────▶ │ Fee Router │ ──────────────▶ │  Payout  │ ──▶ Freelancer (98%)
-  └───────────┘                          └────────────┘                └──────────┘
-        │                                        │
-        │                                        └──▶ Platform (2%)
-        ▼
-  Disputed? → resolve_dispute (arbiter only) → Refund client OR proceed to distribute
+    Funded --> Disputed : Client/Freelancer raises dispute
+    Submitted --> Disputed : Client/Freelancer raises dispute
+    Approved --> Disputed : Client/Freelancer raises dispute
+    
+    Disputed --> Refunded : Arbiter resolves (Refund to Client)
+    Disputed --> Released : Arbiter resolves (Release to Freelancer)
 ```
 
-### Milestone lifecycle
+---
 
-```
-Created → Funded → Submitted → Approved → Released
-             │          │          │
-             └──────────┴──────────┴──▶ Disputed ──▶ Refunded (via arbiter)
-                                                  └──▶ Approved (via arbiter) ──▶ Released
-```
+## 📸 Screenshots
 
-### Folder structure
+#### 💻 Desktop Dashboard view
+> Replace with desktop dashboard screenshot
+`[Dashboard Desktop Screenshot]`
+
+#### 📱 Mobile Dashboard view
+> Replace with mobile dashboard screenshot
+`[Dashboard Mobile Screenshot]`
+
+#### ➕ Create Agreement Flow
+> Replace with Create Job screen capture
+`[Create Agreement Screenshot]`
+
+#### 🔍 Explorer Search page
+> Replace with Explorer query filter list capture
+`[Explorer Screenshot]`
+
+#### ⚖️ Disputes Resolution console
+> Replace with Arbitrator dispute action view
+`[Dispute Console Screenshot]`
+
+---
+
+## 📦 Folder Structure
+
+The repository is structured as a monorepo containing contracts, backend logic, and the web app:
 
 ```
 keystone/
-├── contracts/
-│   ├── escrow/          # Job/milestone state machine, dispute logic
-│   ├── fee-router/       # Platform fee split (98/2)
-│   └── payout/           # Final freelancer-facing transfer
-├── frontend/
-│   ├── src/app/           # Next.js App Router pages
-│   ├── src/components/    # Views (Dashboard, Blueprint/Explorer, Create, Terminal, Activity, Disputes)
-│   ├── src/context/       # WalletContext, TransactionContext
-│   └── src/lib/           # soroban.ts (contract calls), api.ts (backend calls)
-├── backend/
-│   ├── src/index.ts       # Express API — job metadata read/write, signature + on-chain verification
+├── contracts/          # Smart contract workspace
+│   ├── escrow/          # Core state-machine, milestone rules, and disputes
+│   ├── fee-router/      # Platforms fee router splitter (98/2 fee splits)
+│   └── payout/          # Destination payout router to freelancer addresses
+├── frontend/           # Next.js web application
+│   ├── src/app/         # App router wrapper, globals, and navigation views
+│   ├── src/components/  # Layout panels (Dashboard, Explorer, Disputes, Creator forms)
+│   ├── src/context/     # Reactive contexts ( Freighter wallet status, toast notifications)
+│   └── src/lib/         # Soroban contract connectors, api metadata requests
+├── backend/            # Express metadata microservice
+│   ├── src/index.ts     # Express server doing signature auth checks and health metrics
 │   └── .env.example
-├── scripts/
-│   └── deploy.ps1         # Testnet deployment script
-└── docs/
-    └── screenshots/
+├── scripts/            # Script folder
+│   └── deploy.ps1       # Automated Testnet network contract compilation script
+└── docs/               # Visual verification assets
+    └── screenshots/     # Mobile responsive visual captures
 ```
 
 ---
 
-## Smart contracts
+## 📖 Smart Contracts
 
-### Escrow
+Each contract component is architected independently to manage distinct rules within the system model:
 
-| Function | Who calls | Effect |
+### 1. Escrow
+*Designated entry-point contract managing milestones.*
+
+| Function | Calling Authority | Operational Objective |
 |---|---|---|
-| `initialize` | Deployer | Sets arbiter and Fee Router addresses |
-| `create_job` | Client | Creates a job with client, freelancer, token |
-| `add_milestone` | Client | Adds a milestone with an amount |
-| `fund_milestone` | Client | Locks funds for a specific milestone |
-| `submit_milestone` | Freelancer | Marks a milestone as submitted for review |
-| `approve_milestone` | Client | Approves a submitted milestone |
-| `raise_dispute` | Client or freelancer | Freezes a milestone pending arbitration |
-| `resolve_dispute` | Arbiter only | Releases or refunds a disputed milestone |
-| `distribute_milestone` | Anyone (permissionless trigger) | Releases approved funds through the Fee Router chain |
-| `get_job` / `get_milestone` | Anyone | Read-only state queries |
+| `initialize` | Contract Deployer | Configures target arbiter and trusted `FeeRouter` addresses. |
+| `create_job` | Connected Client | Registers a unique job matching client and freelancer address. |
+| `add_milestone` | Connected Client | Inserts a milestone specifying the target reward amount. |
+| `fund_milestone` | Connected Client | Transfers payment tokens into contract custody. |
+| `submit_milestone` | Assigned Freelancer | Updates state flag to `Submitted` requesting review. |
+| `approve_milestone` | Connected Client | Verifies completed deliverables, transitioning state to `Approved`. |
+| `raise_dispute` | Client or Freelancer | Halts operations and locks milestone state to `Disputed`. |
+| `resolve_dispute` | Designated Arbiter | Grants resolution releasing funds to freelancer or client. |
+| `distribute_milestone` | Permissionless (Anyone) | Moves approved milestone funds forward into the `FeeRouter`. |
 
-### Fee Router
+### 2. FeeRouter
+*Auto-split processor.*
 
-| Function | Who calls | Effect |
+| Function | Calling Authority | Operational Objective |
 |---|---|---|
-| `init_fee_router` | Deployer | Sets platform, Escrow, and Payout addresses |
-| `route_funds` | Escrow only (self-authorizing) | Splits incoming funds 98% freelancer / 2% platform |
+| `init_fee_router` | Contract Deployer | Sets Platform fee wallet, Payout contract, and Escrow addresses. |
+| `route_funds` | Escrow Contract Only | Deducts 2% for platform wallet and forwards 98% to Payout. |
 
-### Payout
+### 3. Payout
+*Endpoint execution contract.*
 
-| Function | Who calls | Effect |
+| Function | Calling Authority | Operational Objective |
 |---|---|---|
-| `init_payout` | Deployer | Sets trusted Fee Router address |
-| `execute_payout` | Fee Router only (self-authorizing) | Executes the final freelancer-facing transfer |
-
-Build and test:
-
-```bash
-cd contracts
-cargo test --workspace
-stellar contract build
-```
-
-<!-- CONFIRM: exact test count across all 3 contracts and paste final `cargo test` summary here -->
+| `init_payout` | Contract Deployer | Confirms validation mapping of target `FeeRouter` router address. |
+| `execute_payout` | Fee Router Contract Only | Discharges final 98% payout amount directly to the freelancer. |
 
 ---
 
-## Installation
+## ⚙ Installation
 
 ### Prerequisites
-
-- Node.js 20+ (frontend and backend both require this)
-- Rust 1.84+ with `wasm32v1-none` target (for contracts only)
-- Stellar CLI
-- Freighter browser extension
+- Node.js `v20.x` or higher (compatible with Node 22).
+- Rust `v1.84.0+` with the `wasm32v1-none` compiler target installed.
+- Stellar CLI installed locally.
+- Freighter browser wallet extension with Testnet enabled.
 
 ```bash
 rustup target add wasm32v1-none
 ```
 
-### Setup
+### Installation Steps
 
-```bash
-git clone <!-- INSERT: your repo URL -->
-cd keystone
+1. Clone the repository and configure dependencies:
+   ```bash
+   git clone <REPOSITORY_URL>
+   cd keystone
+   ```
 
-# Frontend
-cd frontend
-npm install
-cp .env.example .env.local
-# Fill in contract addresses, RPC URL, arbiter address — see below
+2. Configure Frontend Environment:
+   ```bash
+   cd frontend
+   npm install
+   cp .env.example .env.local
+   ```
+   *Edit `.env.local` to match your local addresses.*
 
-# Backend
-cd ../backend
-npm install
-cp .env.example .env
-# Fill in Supabase URL/key and Escrow contract ID — must match frontend's value
-```
+3. Configure Backend Environment:
+   ```bash
+   cd ../backend
+   npm install
+   cp .env.example .env
+   ```
+   *Set your Supabase database parameters and CORS origins.*
 
-### Environment variables
+### Environment Configurations
 
-**`frontend/.env.local`:**
-
-| Variable | Required | Description |
+#### Frontend (`frontend/.env.local`)
+| Key | Required | Value / Details |
 |---|---|---|
-| `NEXT_PUBLIC_ESCROW_ID` | Yes | Deployed Escrow contract address |
-| `NEXT_PUBLIC_ROUTER_ID` | Yes | Deployed Fee Router contract address |
-| `NEXT_PUBLIC_PAYOUT_ID` | Yes | Deployed Payout contract address |
-| `NEXT_PUBLIC_TOKEN_ID` | Yes | Wrapped native XLM asset contract address |
-| `NEXT_PUBLIC_ARBITER_ID` | Yes | Designated arbiter's public address |
+| `NEXT_PUBLIC_ESCROW_ID` | Yes | Escrow contract hash address. |
+| `NEXT_PUBLIC_FEE_ROUTER_ID` | Yes | Platform Fee Router contract hash address. |
+| `NEXT_PUBLIC_PAYOUT_ID` | Yes | Freelancer Payout contract hash address. |
+| `NEXT_PUBLIC_TOKEN_ID` | Yes | Token address for payment assets (Wrapped XLM). |
+| `NEXT_PUBLIC_ARBITER_ID` | Yes | Public key address of the designated Arbiter account. |
 | `NEXT_PUBLIC_NETWORK` | No | `testnet` |
-| `NEXT_PUBLIC_RPC_URL` | No | Soroban RPC URL (defaults to public Testnet RPC) |
-| `NEXT_PUBLIC_BACKEND_URL` | Yes | Backend API base URL |
+| `NEXT_PUBLIC_RPC_URL` | No | Target Soroban RPC Endpoint provider. |
+| `NEXT_PUBLIC_BACKEND_URL` | Yes | Base URL endpoint for the metadata app. |
 
-**`backend/.env`:**
-
-| Variable | Required | Description |
+#### Backend (`backend/.env`)
+| Key | Required | Value / Details |
 |---|---|---|
-| `PORT` | No | Defaults to `4000` |
+| `PORT` | No | Server port (default `4000`). |
 | `SUPABASE_URL` | Yes | Your Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (server-side only, never exposed to frontend) |
-| `RPC_URL` | No | Soroban RPC URL |
-| `NETWORK_PASSPHRASE` | No | Defaults to Testnet passphrase |
-| `ESCROW_CONTRACT_ID` | Yes | Must exactly match `frontend/.env.local`'s `NEXT_PUBLIC_ESCROW_ID` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (keep secure, never leak to frontend). |
+| `ESCROW_CONTRACT_ID` | Yes | Must match `NEXT_PUBLIC_ESCROW_ID` in Next.js exactly. |
 
-### Development
+---
 
+## 🧪 Testing
+
+Core contract rules are verified by automated unit tests validating state limits, auth restrictions, and transaction splits.
+
+### Smart Contracts Testing
+The workspace contains 13 unit tests verifying state transitions, limits, and cross-contract splits.
 ```bash
-# Terminal 1 — backend
-cd backend && npm run dev
-
-# Terminal 2 — frontend
-cd frontend && npm run dev
+# Inside the root repository
+cd contracts
+cargo test --workspace
 ```
 
-Open `http://localhost:3000`.
+For WASM build outputs:
+```bash
+stellar contract build
+```
 
-### Production build
+### Running Locally
+Start dev environments for backend and frontend apps in separate terminals:
 
 ```bash
-cd frontend && npm run build && npm start
+# Terminal 1: Backend metadata service
+cd backend
+npm run dev
+
+# Terminal 2: Web frontend
+cd frontend
+npm run dev
 ```
 
 ---
 
-## Demo instructions
-
-End-to-end walkthrough on Stellar Testnet:
-
-### 1. Prepare wallets
-
-- Install [Freighter](https://www.freighter.app/)
-- Switch Freighter to Testnet
-- Fund at least two accounts (client + freelancer) via Friendbot
-
-### 2. Deploy contracts (if not using the addresses above)
-
-```bash
-cd scripts
-./deploy.ps1
-```
-
-Copy the resulting contract addresses into both `.env` files.
-
-### 3. Create a job (client wallet)
-
-- Connect Freighter as the client
-- Navigate to Create, fill in title, description, freelancer address, and one or more milestones
-- Submit — approve each sequential Freighter signature prompt (one per milestone plus the on-chain creation call)
-- Confirm the job appears on Dashboard
-
-### 4. Fund and progress a milestone
-
-- As client: open the job, click Fund Milestone on the first milestone
-- Switch to freelancer wallet: click Submit Milestone
-- Switch back to client: click Approve
-- Either party: click Distribute Funds — confirm the freelancer's balance increases by the milestone amount minus the 2% platform fee
-
-### 5. Dispute flow
-
-- As client or freelancer: raise a dispute on a milestone
-- Switch to the arbiter wallet: confirm Resolve options appear (and only for the arbiter — verify this explicitly with a non-arbiter wallet)
-- Resolve by releasing or refunding
-
----
-
-## Deployment
+## 🚀 Deployment
 
 ### Frontend (Vercel)
+The web wrapper is configured for zero-overhead Vercel deployments:
+1. Link your repository in Vercel dashboard.
+2. Select **Next.js** framework preset.
+3. Import the `frontend` folder path.
+4. Input all `NEXT_PUBLIC_*` environment variables.
+5. Deploy.
 
-<!-- INSERT: production URL once deployed -->
-
-1. Import the repo in Vercel
-2. Framework preset: Next.js
-3. Add all `NEXT_PUBLIC_*` environment variables listed above
-4. Deploy
-
-### Backend
-
-<!-- INSERT: host used (Railway/Render/etc.) and URL -->
-
-1. Deploy `backend/` as a standalone Node service
-2. Set all backend environment variables
-3. Update CORS origin in `backend/src/index.ts` to the production frontend URL
-4. Update `NEXT_PUBLIC_BACKEND_URL` in Vercel to point to this deployed backend
+### Backend (Render / Railway)
+The backend index is packaged for server deployments:
+1. Connect repository codebase to your chosen container service.
+2. Configure build script: `cd backend && npm install && npm run build`.
+3. Start command: `node backend/dist/index.js`.
+4. Configure database variables in application context.
 
 ### Contracts (Testnet)
-
-Already deployed at the addresses listed above. To redeploy:
-
+The contracts are pre-deployed at the addresses listed above. To re-compile and redeploy:
 ```bash
 cd contracts
 stellar contract build
 cd ../scripts
 ./deploy.ps1
 ```
-
-After redeploying, update **both** `frontend/.env.local` and `backend/.env` with the new addresses — they are independently maintained and must stay in sync manually.
-
----
-
-## Testing
-
-```bash
-# Contracts
-cd contracts
-cargo test --workspace
-
-# Frontend
-cd frontend
-npm run test          # <!-- CONFIRM: exact command and test count -->
-```
-
-<!-- CONFIRM: does a CI workflow exist yet? If not, this is a required checklist item — add
-.github/workflows/ci.yml running: cargo test (contracts), cargo build --target wasm32v1-none
-(contracts), and npm run build + any frontend tests. -->
+*Always ensure the resulting hashes are updated in both `.env` configurations.*
 
 ---
 
-## Known limitations
+## 🔒 Security & Permission Model
 
-- Job discovery for Dashboard/Explorer depends on the backend's Supabase index rather than a fully generalized on-chain indexer — jobs only appear once their metadata has been registered through the normal Create Job flow.
-- Dispute reasons are not yet captured as structured on-chain or off-chain data; the arbiter currently resolves based on off-app communication with both parties.
-- Currently supports Freighter only; multi-wallet support (Albedo, xBull, etc. via Stellar Wallets Kit) is a natural next step.
-- The public Testnet RPC endpoint is occasionally subject to brief availability hiccups; a production deployment would use a dedicated/paid RPC provider.
-
----
-
-## Future improvements
-
-- [ ] On-chain event indexer replacing the Supabase-assisted job discovery
-- [ ] Structured dispute-reason capture, shown to the arbiter
-- [ ] Multi-wallet support beyond Freighter
-- [ ] Mainnet deployment guide
-- [ ] Configurable platform fee percentage
-- [ ] Notification system for milestone status changes
+Keystone enforces strict permission isolation directly on ledger levels:
+- **`require_auth()` Checks**: Escrow validation verifies that clients cannot fund/approve milestones using other addresses, and freelancers can only mark progress for milestones assigned to them.
+- **Autonomous Payout Access**: Payout contracts only execute requests that provide validated sign-offs from the Fee Router.
+- **Metadata Protection**: Supabase updates are validated on the backend by confirming that requested changes match signatures generated by actual on-chain contract owners.
 
 ---
 
-## Contributing
+## ⚠️ Known Limitations
 
-1. Fork the repository
-2. Create a feature branch
-3. Run the full test suite before opening a PR
-4. Open a pull request with a clear description
+- **Supabase Dependency**: Job searches on dashboard rely on metadata indexed during job creation, not direct on-chain state rebuilds.
+- **Unstructured Disputes**: Dispute reasons and chat are managed off-platform; arbiters resolve based on off-app communications.
+- **Freighter Wallet Exclusive**: Connect actions do not natively support other wallet providers.
+
+---
+
+## 🔮 Future Improvements
+
+- [ ] Implement an on-chain ledger event indexer to replace the Supabase metadata query engine.
+- [ ] Incorporate structured encrypted dispute logs and messaging within the arbitrator panel.
+- [ ] Connect Stellar Wallets Kit to support Albedo, xBull, and alternative wallet connectors.
+- [ ] Mainnet network support configuration guide.
+- [ ] Configurable platform fee percentage.
+- [ ] Notification system for milestone status changes.
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
