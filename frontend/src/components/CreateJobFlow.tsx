@@ -385,7 +385,7 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
                         <input
                             type="text"
                             className="draft-input mono"
-                            placeholder="GABC7X9K2LFRE4M1PQRS8T2NHIJKLMNOPQRSTUVWXYZ"
+                            placeholder="G......................................................."
                             value={freelancer}
                             onChange={e => {
                                 const val = e.target.value;
