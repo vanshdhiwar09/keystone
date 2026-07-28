@@ -7,6 +7,8 @@ import {
     requestAccess,
     getAddress,
     getNetworkDetails,
+    signTransaction,
+    signMessage,
 } from "@stellar/freighter-api";
 
 export type InstallState = "loading" | "error" | true | false;
@@ -19,6 +21,8 @@ interface WalletContextType {
     checkFreighter: () => Promise<void>;
     connect: () => Promise<void>;
     disconnect: () => void;
+    signTransaction: (xdr: string, opts?: { network?: string; networkPassphrase?: string; address?: string }) => Promise<{ signedTxXdr: string }>;
+    signMessage: (message: string, opts?: { address?: string }) => Promise<any>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -59,12 +63,60 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (extConnected) {
-                const { isAllowed: extAllowed } = await isAllowed();
+                let extAllowed = false;
+                const win = window as any;
+
+                if (win.stellar && typeof win.stellar.isAllowed === "function") {
+                    const res = await win.stellar.isAllowed();
+                    extAllowed = typeof res === "boolean" ? res : !!res.isAllowed;
+                } else if (win.freighter && typeof win.freighter.isAllowed === "function") {
+                    const res = await win.freighter.isAllowed();
+                    extAllowed = typeof res === "boolean" ? res : !!res.isAllowed;
+                } else {
+                    const res = await isAllowed();
+                    extAllowed = !!res.isAllowed;
+                }
+
                 if (extAllowed) {
-                    const { network: currentNetwork } = await getNetworkDetails();
+                    let currentNetwork = "";
+                    if (win.stellar && typeof win.stellar.getNetworkDetails === "function") {
+                        const netRes = await win.stellar.getNetworkDetails();
+                        currentNetwork = typeof netRes === "string" ? netRes : netRes.network || "";
+                    } else if (win.freighter && typeof win.freighter.getNetworkDetails === "function") {
+                        const netRes = await win.freighter.getNetworkDetails();
+                        currentNetwork = typeof netRes === "string" ? netRes : netRes.network || "";
+                    } else {
+                        const netRes = await getNetworkDetails();
+                        currentNetwork = netRes.network || "";
+                    }
                     setNetwork(currentNetwork);
 
-                    const { address } = await getAddress();
+                    let address = "";
+                    if (win.stellar && typeof win.stellar.getAddress === "function") {
+                        const addrRes = await win.stellar.getAddress();
+                        if (typeof addrRes === "string") {
+                            address = addrRes;
+                        } else if (addrRes && typeof addrRes === "object") {
+                            address = addrRes.address || addrRes.publicKey || "";
+                        }
+                    } else if (win.freighter && typeof win.freighter.getAddress === "function") {
+                        const addrRes = await win.freighter.getAddress();
+                        if (typeof addrRes === "string") {
+                            address = addrRes;
+                        } else if (addrRes && typeof addrRes === "object") {
+                            address = addrRes.address || addrRes.publicKey || "";
+                        }
+                    }
+
+                    if (!address) {
+                        try {
+                            const res = await getAddress();
+                            address = res.address || "";
+                        } catch (err) {
+                            console.error("getAddress fallback error:", err);
+                        }
+                    }
+
                     if (address) {
                         setPublicKey(address);
                     } else {
@@ -116,15 +168,81 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
     const connect = async () => {
         try {
-            const { address } = await requestAccess();
+            let address = "";
+            let currentNetwork = "";
+            const win = window as any;
+
+            if (win.stellar && typeof win.stellar.requestAccess === "function") {
+                const res = await win.stellar.requestAccess();
+                if (typeof res === "string") {
+                    address = res;
+                } else if (res && typeof res === "object") {
+                    address = res.address || res.publicKey || "";
+                }
+            } else if (win.freighter && typeof win.freighter.requestAccess === "function") {
+                const res = await win.freighter.requestAccess();
+                if (typeof res === "string") {
+                    address = res;
+                } else if (res && typeof res === "object") {
+                    address = res.address || res.publicKey || "";
+                }
+            }
+
+            if (!address) {
+                const res = await requestAccess();
+                address = res.address || "";
+            }
+
             if (address) {
                 setPublicKey(address);
+
+                if (win.stellar && typeof win.stellar.getNetworkDetails === "function") {
+                    const netRes = await win.stellar.getNetworkDetails();
+                    currentNetwork = typeof netRes === "string" ? netRes : netRes.network || "";
+                } else if (win.freighter && typeof win.freighter.getNetworkDetails === "function") {
+                    const netRes = await win.freighter.getNetworkDetails();
+                    currentNetwork = typeof netRes === "string" ? netRes : netRes.network || "";
+                } else {
+                    const netRes = await getNetworkDetails();
+                    currentNetwork = netRes.network || "";
+                }
+                setNetwork(currentNetwork);
             }
-            const { network: currentNetwork } = await getNetworkDetails();
-            setNetwork(currentNetwork);
         } catch (e) {
             console.error("Failed to connect Freighter Extension:", e);
         }
+    };
+
+    const signTransactionWrapper = async (
+        xdr: string,
+        opts?: { network?: string; networkPassphrase?: string; address?: string }
+    ) => {
+        const win = window as any;
+        if (win.stellar && typeof win.stellar.signTransaction === "function") {
+            const res = await win.stellar.signTransaction(xdr, opts);
+            if (typeof res === "string") return { signedTxXdr: res };
+            return res;
+        }
+        if (win.freighter && typeof win.freighter.signTransaction === "function") {
+            const res = await win.freighter.signTransaction(xdr, opts);
+            if (typeof res === "string") return { signedTxXdr: res };
+            return res;
+        }
+        return await signTransaction(xdr, opts as any);
+    };
+
+    const signMessageWrapper = async (
+        message: string,
+        opts?: { address?: string }
+    ) => {
+        const win = window as any;
+        if (win.stellar && typeof win.stellar.signMessage === "function") {
+            return await win.stellar.signMessage(message, opts);
+        }
+        if (win.freighter && typeof win.freighter.signMessage === "function") {
+            return await win.freighter.signMessage(message, opts);
+        }
+        return await signMessage(message, opts);
     };
 
     const disconnect = () => {
@@ -132,7 +250,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <WalletContext.Provider value={{ installed, network, publicKey, isMobile, checkFreighter, connect, disconnect }}>
+        <WalletContext.Provider
+            value={{
+                installed,
+                network,
+                publicKey,
+                isMobile,
+                checkFreighter,
+                connect,
+                disconnect,
+                signTransaction: signTransactionWrapper,
+                signMessage: signMessageWrapper,
+            }}
+        >
             {children}
         </WalletContext.Provider>
     );

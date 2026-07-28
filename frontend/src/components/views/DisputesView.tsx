@@ -5,7 +5,6 @@ import { useWallet } from "../../context/WalletContext";
 import { fetchJobMetadata, JobMetadataPayload } from "../../lib/api";
 import { fetchJobData, txResolveDispute, pollTx, server, ARBITER_ID, invalidateJobCache } from "../../lib/soroban";
 import { TransactionBuilder } from "@stellar/stellar-sdk";
-import { signTransaction } from "@stellar/freighter-api";
 import { useToast } from "../../context/ToastContext";
 
 function truncate(s: string) { return s ? `${s.slice(0, 6)}…${s.slice(-4)}` : "—"; }
@@ -19,7 +18,7 @@ interface DisputeEntry {
 }
 
 export default function DisputesView() {
-    const { publicKey, network } = useWallet();
+    const { publicKey, network, signTransaction } = useWallet();
     const { toast, dismissToast, isUserCancellation, getFriendlyErrorMessage } = useToast();
     const [jobs, setJobs] = useState<JobMetadataPayload[]>([]);
     const [loading, setLoading] = useState(true);

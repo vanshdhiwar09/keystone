@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { StrKey, TransactionBuilder, xdr, scValToNative } from "@stellar/stellar-sdk";
-import { signTransaction, signMessage } from "@stellar/freighter-api";
 import { useWallet } from "../context/WalletContext";
 import { useTx } from "../context/TransactionContext";
 import { useToast } from "../context/ToastContext";
@@ -36,7 +35,7 @@ function stroopsFromXlm(amount: string): bigint {
 }
 
 export default function CreateJobFlow({ setView }: { setView?: (v: string) => void }) {
-    const { publicKey } = useWallet();
+    const { publicKey, signTransaction, signMessage } = useWallet();
     const { setState, resetTx } = useTx();
     const { toast, dismissToast, isUserCancellation, getFriendlyErrorMessage } = useToast();
 

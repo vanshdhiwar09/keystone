@@ -12,7 +12,6 @@ import {
 } from "../../lib/soroban";
 import { TransactionBuilder } from "@stellar/stellar-sdk";
 import { fetchJobMetadata, JobMetadataPayload, updateDisputeMetadata } from "../../lib/api";
-import { signTransaction } from "@stellar/freighter-api";
 import { useToast } from "../../context/ToastContext";
 import { validateRequiredText } from "../../lib/validation";
 
@@ -76,7 +75,7 @@ function RaiseDisputeModal({
     onClose: () => void;
     onSuccess: () => void;
 }) {
-    const { publicKey, network } = useWallet();
+    const { publicKey, network, signTransaction } = useWallet();
     const { toast, dismissToast, isUserCancellation, getFriendlyErrorMessage } = useToast();
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -307,7 +306,7 @@ function MilestoneActions({
 }) {
     const [working, setWorking] = useState(false);
     const [msg, setMsg] = useState("");
-    const { publicKey, network } = useWallet();
+    const { publicKey, network, signTransaction } = useWallet();
     const { toast, dismissToast, isUserCancellation, getFriendlyErrorMessage } = useToast();
 
     const passphrase = network === "TESTNET"
