@@ -11,8 +11,25 @@ const app = express();
 const port = process.env.PORT || 4000;
 
 // Enable strict CORS specifically bound to the exact origin footprint
+const allowedOrigins = ["http://localhost:3000", "http://localhost:3001"];
+if (process.env.FRONTEND_URL) {
+    const envOrigins = process.env.FRONTEND_URL.split(",").map(o => o.trim());
+    envOrigins.forEach(o => {
+        if (o && !allowedOrigins.includes(o)) {
+            allowedOrigins.push(o);
+        }
+    });
+}
+
 app.use(cors({
-    origin: [process.env.FRONTEND_URL || "http://localhost:3000"],
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error(`Origin ${origin} not allowed by CORS`));
+        }
+    },
     methods: ["GET", "POST", "PUT"]
 }));
 app.use(express.json());

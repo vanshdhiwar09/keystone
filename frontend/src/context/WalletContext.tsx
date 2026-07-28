@@ -15,6 +15,7 @@ interface WalletContextType {
     installed: InstallState;
     network: string | null;
     publicKey: string | null;
+    isMobile: boolean;
     checkFreighter: () => Promise<void>;
     connect: () => Promise<void>;
     disconnect: () => void;
@@ -26,17 +27,36 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const [installed, setInstalled] = useState<InstallState>("loading");
     const [network, setNetwork] = useState<string | null>(null);
     const [publicKey, setPublicKey] = useState<string | null>(null);
+    const [isMobile, setIsMobile] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            setIsMobile(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+        }
+    }, []);
 
     const checkFreighter = async () => {
         try {
-            const { isConnected: extConnected } = await isConnected();
-
-            // Prevent flashing back to 'loading' if already resolved cleanly
-            if (installed === "loading") {
-                setInstalled(extConnected);
-            } else if (installed !== extConnected) {
-                setInstalled(extConnected);
+            let extConnected = false;
+            if (typeof window !== "undefined") {
+                const win = window as any;
+                const hasInjected = !!(
+                    win.freighter ||
+                    win.stellar?.isFreighter ||
+                    win.stellar?.platform === "mobile"
+                );
+                if (hasInjected) {
+                    extConnected = true;
+                } else {
+                    const res = await isConnected();
+                    extConnected = !!res.isConnected;
+                }
             }
+
+            setInstalled(prev => {
+                if (prev !== extConnected) return extConnected;
+                return prev;
+            });
 
             if (extConnected) {
                 const { isAllowed: extAllowed } = await isAllowed();
@@ -66,8 +86,32 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         checkFreighter();
-        const interval = setInterval(checkFreighter, 2000);
-        return () => clearInterval(interval);
+
+        // Short poll on mount to catch asynchronous injection on mobile/delayed loads
+        let count = 0;
+        const pollInterval = setInterval(() => {
+            checkFreighter();
+            count++;
+            if (count >= 6) clearInterval(pollInterval);
+        }, 500);
+
+        // Fallback slow interval for general syncing
+        const slowInterval = setInterval(checkFreighter, 4000);
+
+        // Event listeners to check when tab is focused/visible again
+        const handleFocusCheck = () => {
+            checkFreighter();
+        };
+
+        window.addEventListener("focus", handleFocusCheck);
+        window.addEventListener("visibilitychange", handleFocusCheck);
+
+        return () => {
+            clearInterval(pollInterval);
+            clearInterval(slowInterval);
+            window.removeEventListener("focus", handleFocusCheck);
+            window.removeEventListener("visibilitychange", handleFocusCheck);
+        };
     }, []);
 
     const connect = async () => {
@@ -88,7 +132,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <WalletContext.Provider value={{ installed, network, publicKey, checkFreighter, connect, disconnect }}>
+        <WalletContext.Provider value={{ installed, network, publicKey, isMobile, checkFreighter, connect, disconnect }}>
             {children}
         </WalletContext.Provider>
     );
