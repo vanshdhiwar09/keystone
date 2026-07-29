@@ -77,22 +77,22 @@ fn setup_three_hop_contracts(
     env: &Env,
 ) -> (
     Address,
-    EscrowContractClient,
+    EscrowContractClient<'_>,
     Address,
-    FeeRouterContractClient,
+    FeeRouterContractClient<'_>,
     Address,
-    PayoutContractClient,
+    PayoutContractClient<'_>,
     Address,
     Address,
 ) {
     let contract_id = env.register(EscrowContract, ());
-    let client = EscrowContractClient::new(&env, &contract_id);
-    let arbiter = Address::generate(&env);
+    let client = EscrowContractClient::new(env, &contract_id);
+    let arbiter = Address::generate(env);
     let router_id = env.register(FeeRouterContract, ());
-    let router_client = FeeRouterContractClient::new(&env, &router_id);
+    let router_client = FeeRouterContractClient::new(env, &router_id);
     let payout_id = env.register(PayoutContract, ());
-    let payout_client = PayoutContractClient::new(&env, &payout_id);
-    let platform_addr = Address::generate(&env);
+    let payout_client = PayoutContractClient::new(env, &payout_id);
+    let platform_addr = Address::generate(env);
 
     payout_client.init_payout(&router_id);
     router_client.init_fee_router(&platform_addr, &contract_id, &payout_id);

@@ -79,6 +79,8 @@ impl EscrowContract {
         Ok(())
     }
 
+    // TODO: Migrate to #[contractevent] when event structure compatibility is refactored frontend-wide.
+    #[allow(deprecated)]
     pub fn create_job(
         env: Env,
         client: Address,
@@ -117,6 +119,8 @@ impl EscrowContract {
         Ok(job_id)
     }
 
+    // TODO: Migrate to #[contractevent] when event structure compatibility is refactored frontend-wide.
+    #[allow(deprecated)]
     pub fn add_milestone(
         env: Env,
         client: Address,
@@ -166,6 +170,8 @@ impl EscrowContract {
         Ok(milestone_id)
     }
 
+    // TODO: Migrate to #[contractevent] when event structure compatibility is refactored frontend-wide.
+    #[allow(deprecated)]
     pub fn fund_milestone(
         env: Env,
         client: Address,
@@ -197,7 +203,7 @@ impl EscrowContract {
         }
 
         let token_client = token::Client::new(&env, &job.token);
-        token_client.transfer(&client, &env.current_contract_address(), &milestone.amount);
+        token_client.transfer(&client, env.current_contract_address(), &milestone.amount);
 
         milestone.status = Status::Funded;
 
@@ -216,6 +222,8 @@ impl EscrowContract {
         Ok(())
     }
 
+    // TODO: Migrate to #[contractevent] when event structure compatibility is refactored frontend-wide.
+    #[allow(deprecated)]
     pub fn submit_milestone(
         env: Env,
         freelancer: Address,
@@ -262,6 +270,8 @@ impl EscrowContract {
         Ok(())
     }
 
+    // TODO: Migrate to #[contractevent] when event structure compatibility is refactored frontend-wide.
+    #[allow(deprecated)]
     pub fn approve_milestone(
         env: Env,
         client: Address,
@@ -308,6 +318,8 @@ impl EscrowContract {
         Ok(())
     }
 
+    // TODO: Migrate to #[contractevent] when event structure compatibility is refactored frontend-wide.
+    #[allow(deprecated)]
     pub fn raise_dispute(
         env: Env,
         caller: Address,
@@ -357,6 +369,8 @@ impl EscrowContract {
         Ok(())
     }
 
+    // TODO: Migrate to #[contractevent] when event structure compatibility is refactored frontend-wide.
+    #[allow(deprecated)]
     pub fn resolve_dispute(
         env: Env,
         caller: Address,
@@ -420,6 +434,8 @@ impl EscrowContract {
         Ok(())
     }
 
+    // TODO: Migrate to #[contractevent] when event structure compatibility is refactored frontend-wide.
+    #[allow(deprecated)]
     pub fn distribute_milestone(
         env: Env,
         job_id: u32,
