@@ -148,8 +148,14 @@ stateDiagram-v2
 #### ⚖️ Disputes Resolution console
 ![Disputes Resolution](testscreenshot/disputes.png)
 
-#### 🔄 CI/CD pipeline
-![CI/CD Pipeline](testscreenshot/ci-cd-pipeline.png)
+#### 🔄 CI/CD Pipeline
+![CI/CD Pipeline](testscreenshot/CI%20-%20CD.png)
+
+#### 🖥️ Frontend Verification
+![Frontend Verification](testscreenshot/FRONTEND.png)
+
+#### 📜 Smart Contract Verification
+![Smart Contract Verification](testscreenshot/Smart%20Contract%20.png)
 
 #### 🧪 Test output
 ![Test Output](testscreenshot/test1.png)
