@@ -43,12 +43,12 @@ impl PayoutContract {
             .instance()
             .get(&ROUTER_ADDR)
             .ok_or(PayoutError::NotInitialized)?;
-        
+
         // Ensure ONLY the Fee Router can legally trigger payouts dynamically.
         router.require_auth();
 
         let token_client = token::Client::new(&env, &token);
-        
+
         if amount > 0 {
             token_client.transfer(&env.current_contract_address(), &freelancer, &amount);
         }
@@ -56,5 +56,5 @@ impl PayoutContract {
         Ok(())
     }
 }
- 
-mod test; 
+
+mod test;

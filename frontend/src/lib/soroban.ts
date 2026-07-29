@@ -14,10 +14,21 @@ export const NETWORK_PASSPHRASE = Networks.TESTNET;
 export const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://soroban-testnet.stellar.org";
 export const server = new rpc.Server(RPC_URL);
 
+export interface ChainMilestone {
+    status: string;
+}
+
+export interface ChainJob {
+    client: string;
+    freelancer: string;
+    milestones: ChainMilestone[];
+}
+
 // Helper to identify temporary/transient errors
-function isTransientError(err: any): boolean {
+function isTransientError(err: unknown): boolean {
     if (!err) return false;
-    const msg = String(err.message || err.error || err || "").toLowerCase();
+    const errorObj = err as Record<string, unknown>;
+    const msg = String(errorObj.message || errorObj.error || err || "").toLowerCase();
 
     if (
         msg.includes("failed to fetch") ||
@@ -36,7 +47,7 @@ function isTransientError(err: any): boolean {
         return true;
     }
 
-    const status = err.status || (err.response && err.response.status);
+    const status = Number(errorObj.status || (errorObj.response && (errorObj.response as Record<string, unknown>).status));
     if (status === 429 || status === 502 || status === 503 || status === 504) {
         return true;
     }
@@ -50,9 +61,11 @@ async function withRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3
     while (attempt < maxAttempts) {
         try {
             return await fn();
-        } catch (error: any) {
+        } catch (error: unknown) {
             attempt++;
-            const isTransient = isTransientError(error) || String(error.message || error).toLowerCase().includes("account not found");
+            const errorObj = error as Record<string, unknown>;
+            const errorMsg = String(errorObj.message || error);
+            const isTransient = isTransientError(error) || errorMsg.toLowerCase().includes("account not found");
 
             if (isTransient && attempt < maxAttempts) {
                 const delay = Math.pow(2, attempt) * 500;
@@ -60,7 +73,7 @@ async function withRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3
                     (typeof process !== "undefined" && process.env?.NODE_ENV === "development") ||
                     (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
                 ) {
-                    console.warn(`[RPC Retry ${attempt}/${maxAttempts}] ${label} failed with transient error: "${error.message || error}". Retrying in ${delay}ms...`);
+                    console.warn(`[RPC Retry ${attempt}/${maxAttempts}] ${label} failed with transient error: "${errorMsg}". Retrying in ${delay}ms...`);
                 }
                 await new Promise((resolve) => setTimeout(resolve, delay));
                 continue;
@@ -81,7 +94,7 @@ server.getAccount = async function (address: string) {
 };
 
 const originalSimulateTransaction = server.simulateTransaction.bind(server);
-server.simulateTransaction = async function (tx: any) {
+server.simulateTransaction = async function (tx: Parameters<typeof originalSimulateTransaction>[0]) {
     return await withRetry(
         () => originalSimulateTransaction(tx),
         "simulateTransaction"
@@ -89,7 +102,7 @@ server.simulateTransaction = async function (tx: any) {
 };
 
 const originalPrepareTransaction = server.prepareTransaction.bind(server);
-server.prepareTransaction = async function (tx: any) {
+server.prepareTransaction = async function (tx: Parameters<typeof originalPrepareTransaction>[0]) {
     return await withRetry(
         () => originalPrepareTransaction(tx),
         "prepareTransaction"
@@ -97,7 +110,7 @@ server.prepareTransaction = async function (tx: any) {
 };
 
 const originalSendTransaction = server.sendTransaction.bind(server);
-server.sendTransaction = async function (tx: any) {
+server.sendTransaction = async function (tx: Parameters<typeof originalSendTransaction>[0]) {
     return await withRetry(
         () => originalSendTransaction(tx),
         "sendTransaction"
@@ -140,8 +153,9 @@ export async function buildContractTransaction(
     try {
         const preparedTx = await server.prepareTransaction(tx);
         return preparedTx;
-    } catch (error: any) {
-        const msg = error.message || String(error);
+    } catch (error: unknown) {
+        const errorObj = error as Record<string, unknown>;
+        const msg = String(errorObj.message || error);
         console.error("Soroban Simulation Failed:", msg);
 
         if (method === "distribute_milestone" && msg.includes("Error(Contract")) {
@@ -276,7 +290,9 @@ export async function txResolveDispute(callerPubKey: string, jobId: number, mile
     );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const inFlightJobQueries = new Map<string, Promise<any>>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const inFlightMilestoneQueries = new Map<string, Promise<any>>();
 
 export async function fetchJobData(jobId: number, sourcePublicKey: string) {
@@ -353,14 +369,16 @@ export async function fetchMilestoneData(jobId: number, milestoneId: number, sou
     return promise;
 }
 
-export async function pollTx(hash: string, maxAttempts = 10): Promise<any> {
+export async function pollTx(hash: string, maxAttempts = 10): Promise<rpc.Api.GetTransactionResponse> {
     for (let i = 0; i < maxAttempts; i++) {
         try {
             const tx = await server.getTransaction(hash);
             if (tx.status === "SUCCESS") return tx;
             if (tx.status === "FAILED") throw new Error("Transaction execution failed on the ledger.");
-        } catch (e: any) {
-            if (e.message && e.message.includes("failed on the ledger")) {
+        } catch (e: unknown) {
+            const errorObj = e as Record<string, unknown>;
+            const errorMsg = String(errorObj.message || e);
+            if (errorMsg.includes("failed on the ledger")) {
                 throw e;
             }
             if (i === maxAttempts - 1) throw e;
@@ -374,15 +392,15 @@ export async function pollTx(hash: string, maxAttempts = 10): Promise<any> {
 
 export type JobStatus = "active" | "disputed" | "done";
 
-export function getJobStatus(chainData: any): JobStatus {
+export function getJobStatus(chainData: ChainJob | null | undefined): JobStatus {
     if (!chainData?.milestones) return "active";
-    const statuses: string[] = chainData.milestones.map((m: any) => String(m?.status ?? "").toLowerCase());
+    const statuses: string[] = chainData.milestones.map((m: ChainMilestone | null | undefined) => String(m?.status ?? "").toLowerCase());
     if (statuses.some(s => s.includes("dispute"))) return "disputed";
     if (statuses.every(s => s.includes("approve") || s.includes("release") || s.includes("refund"))) return "done";
     return "active";
 }
 
-const jobSessionCache = new Map<number, { chainData: any; status: JobStatus }>();
+const jobSessionCache = new Map<number, { chainData: ChainJob; status: JobStatus }>();
 
 export function invalidateJobCache(jobId: number) {
     jobSessionCache.delete(jobId);

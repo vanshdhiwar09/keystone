@@ -13,6 +13,17 @@ import {
 
 export type InstallState = "loading" | "error" | true | false;
 
+interface InjectedStellar {
+    isFreighter?: boolean;
+    platform?: string;
+    isAllowed?: () => Promise<boolean | { isAllowed: boolean }>;
+    getNetworkDetails?: () => Promise<string | { network: string }>;
+    getAddress?: () => Promise<string | { address: string; publicKey?: string }>;
+    requestAccess?: () => Promise<string | { address: string; publicKey?: string }>;
+    signTransaction?: (xdr: string, opts?: { network?: string; networkPassphrase?: string; address?: string }) => Promise<string | { signedTxXdr: string }>;
+    signMessage?: (message: string, opts?: { address?: string }) => Promise<unknown>;
+}
+
 interface WalletContextType {
     installed: InstallState;
     network: string | null;
@@ -22,7 +33,7 @@ interface WalletContextType {
     connect: () => Promise<void>;
     disconnect: () => void;
     signTransaction: (xdr: string, opts?: { network?: string; networkPassphrase?: string; address?: string }) => Promise<{ signedTxXdr: string }>;
-    signMessage: (message: string, opts?: { address?: string }) => Promise<any>;
+    signMessage: (message: string, opts?: { address?: string }) => Promise<unknown>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -35,6 +46,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (typeof window !== "undefined") {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsMobile(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
         }
     }, []);
@@ -43,7 +55,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         try {
             let extConnected = false;
             if (typeof window !== "undefined") {
-                const win = window as any;
+                const win = window as Window & { stellar?: InjectedStellar; freighter?: InjectedStellar };
                 const hasInjected = !!(
                     win.freighter ||
                     win.stellar?.isFreighter ||
@@ -64,7 +76,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
             if (extConnected) {
                 let extAllowed = false;
-                const win = window as any;
+                const win = window as Window & { stellar?: InjectedStellar; freighter?: InjectedStellar };
 
                 if (win.stellar && typeof win.stellar.isAllowed === "function") {
                     const res = await win.stellar.isAllowed();
@@ -137,6 +149,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         checkFreighter();
 
         // Short poll on mount to catch asynchronous injection on mobile/delayed loads
@@ -170,7 +183,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         try {
             let address = "";
             let currentNetwork = "";
-            const win = window as any;
+            const win = window as Window & { stellar?: InjectedStellar; freighter?: InjectedStellar };
 
             if (win.stellar && typeof win.stellar.requestAccess === "function") {
                 const res = await win.stellar.requestAccess();
@@ -217,7 +230,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         xdr: string,
         opts?: { network?: string; networkPassphrase?: string; address?: string }
     ) => {
-        const win = window as any;
+        const win = window as Window & { stellar?: InjectedStellar; freighter?: InjectedStellar };
         if (win.stellar && typeof win.stellar.signTransaction === "function") {
             const res = await win.stellar.signTransaction(xdr, opts);
             if (typeof res === "string") return { signedTxXdr: res };
@@ -228,14 +241,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             if (typeof res === "string") return { signedTxXdr: res };
             return res;
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return await signTransaction(xdr, opts as any);
     };
 
     const signMessageWrapper = async (
         message: string,
         opts?: { address?: string }
-    ) => {
-        const win = window as any;
+    ): Promise<unknown> => {
+        const win = window as Window & { stellar?: InjectedStellar; freighter?: InjectedStellar };
         if (win.stellar && typeof win.stellar.signMessage === "function") {
             return await win.stellar.signMessage(message, opts);
         }

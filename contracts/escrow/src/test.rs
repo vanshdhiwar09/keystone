@@ -1,9 +1,9 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{Env, testutils::Address as _, token};
 use fee_router::{FeeRouterContract, FeeRouterContractClient};
 use payout::{PayoutContract, PayoutContractClient};
+use soroban_sdk::{testutils::Address as _, token, Env};
 
 fn create_token_contract<'a>(env: &Env, admin: &Address) -> token::Client<'a> {
     let sac = env.register_stellar_asset_contract_v2(admin.clone());
@@ -19,16 +19,16 @@ fn test_create_job_and_milestones() {
     let contract_id = env.register(EscrowContract, ());
     let client = EscrowContractClient::new(&env, &contract_id);
     let arbiter = Address::generate(&env);
-    
+
     // 2. Fee Router
     let router_id = env.register(FeeRouterContract, ());
     let router_client = FeeRouterContractClient::new(&env, &router_id);
-    
+
     // 3. Payout
     let payout_id = env.register(PayoutContract, ());
     let payout_client = PayoutContractClient::new(&env, &payout_id);
     payout_client.init_payout(&router_id);
-    
+
     let platform_addr = Address::generate(&env);
     router_client.init_fee_router(&platform_addr, &contract_id, &payout_id);
 
@@ -36,7 +36,7 @@ fn test_create_job_and_milestones() {
 
     let client_addr = Address::generate(&env);
     let freelancer_addr = Address::generate(&env);
-    
+
     let token_admin = Address::generate(&env);
     let token = create_token_contract(&env, &token_admin);
     let token_admin_client = token::StellarAssetClient::new(&env, &token.address);
@@ -48,26 +48,43 @@ fn test_create_job_and_milestones() {
     client.fund_milestone(&client_addr, &job_id, &m1_id);
     client.submit_milestone(&freelancer_addr, &job_id, &m1_id);
     client.approve_milestone(&client_addr, &job_id, &m1_id);
-    assert_eq!(client.get_milestone(&job_id, &m1_id).status, Status::Approved);
+    assert_eq!(
+        client.get_milestone(&job_id, &m1_id).status,
+        Status::Approved
+    );
 
     // Call successfully routes explicitly spanning Escrow -> Router -> Payout natively!
     client.distribute_milestone(&job_id, &m1_id);
-    assert_eq!(client.get_milestone(&job_id, &m1_id).status, Status::Released);
-    
+    assert_eq!(
+        client.get_milestone(&job_id, &m1_id).status,
+        Status::Released
+    );
+
     // Exact Math Assertions: Validating physical tokens landing efficiently.
     assert_eq!(token.balance(&contract_id), 0); // Escrow Empty
-    assert_eq!(token.balance(&router_id), 0);   // Router Empty
-    assert_eq!(token.balance(&payout_id), 0);   // Payout Empty (Net Zero)
-    
+    assert_eq!(token.balance(&router_id), 0); // Router Empty
+    assert_eq!(token.balance(&payout_id), 0); // Payout Empty (Net Zero)
+
     assert_eq!(token.balance(&freelancer_addr), 980); // 98% of 1000 successfully bypassed!
-    assert_eq!(token.balance(&platform_addr), 20);    // 2% of 1000 locked tightly dynamically!
+    assert_eq!(token.balance(&platform_addr), 20); // 2% of 1000 locked tightly dynamically!
 }
 
 // ------------------------------------------------------------------------------------------------ //
 // NEGATIVE TESTS (VERIFYING STRICT `try_` ERROR RESPONSES)
 // ------------------------------------------------------------------------------------------------ //
 
-fn setup_three_hop_contracts(env: &Env) -> (Address, EscrowContractClient, Address, FeeRouterContractClient, Address, PayoutContractClient, Address, Address) {
+fn setup_three_hop_contracts(
+    env: &Env,
+) -> (
+    Address,
+    EscrowContractClient,
+    Address,
+    FeeRouterContractClient,
+    Address,
+    PayoutContractClient,
+    Address,
+    Address,
+) {
     let contract_id = env.register(EscrowContract, ());
     let client = EscrowContractClient::new(&env, &contract_id);
     let arbiter = Address::generate(&env);
@@ -76,12 +93,21 @@ fn setup_three_hop_contracts(env: &Env) -> (Address, EscrowContractClient, Addre
     let payout_id = env.register(PayoutContract, ());
     let payout_client = PayoutContractClient::new(&env, &payout_id);
     let platform_addr = Address::generate(&env);
-    
+
     payout_client.init_payout(&router_id);
     router_client.init_fee_router(&platform_addr, &contract_id, &payout_id);
     client.initialize(&arbiter, &router_id);
-    
-    (contract_id, client, router_id, router_client, payout_id, payout_client, arbiter, platform_addr)
+
+    (
+        contract_id,
+        client,
+        router_id,
+        router_client,
+        payout_id,
+        payout_client,
+        arbiter,
+        platform_addr,
+    )
 }
 
 #[test]
@@ -132,7 +158,7 @@ fn test_double_distribute_milestone() {
 
     let client_addr = Address::generate(&env);
     let freelancer_addr = Address::generate(&env);
-    
+
     let token_admin = Address::generate(&env);
     let token = create_token_contract(&env, &token_admin);
     let token_admin_client = token::StellarAssetClient::new(&env, &token.address);
@@ -206,7 +232,7 @@ fn test_unauthorized_resolve_dispute_by_client() {
 
     client.fund_milestone(&client_addr, &job_id, &m1_id);
     client.raise_dispute(&client_addr, &job_id, &m1_id);
-    
+
     let result = client.try_resolve_dispute(&client_addr, &job_id, &m1_id, &true);
     assert_eq!(result, Err(Ok(EscrowError::NotAuthorizedArbiter)));
 }

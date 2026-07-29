@@ -145,6 +145,7 @@ export default function ActivityView({ setView }: ActivityViewProps) {
     const [events, setEvents] = useState<ParsedEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [reconnecting, setReconnecting] = useState(false);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [timeTicker, setTimeTicker] = useState(0);
 
     const lastLedgerRef = useRef<number | null>(null);
@@ -154,7 +155,7 @@ export default function ActivityView({ setView }: ActivityViewProps) {
     const retryDelayRef = useRef<number>(10000); // 10s default
 
     // Metadata caches
-    const metadataMapRef = useRef<{
+    const [metadataMap, setMetadataMap] = useState<{
         jobs: Record<number, string>;
         milestones: Record<string, string>;
     }>({ jobs: {}, milestones: {} });
@@ -172,13 +173,13 @@ export default function ActivityView({ setView }: ActivityViewProps) {
                 for (const job of metaJobs) {
                     jobsMap[job.jobId] = job.title;
                     if (job.milestones) {
-                        job.milestones.forEach((m: any, idx: number) => {
+                        job.milestones.forEach((m: { title: string }, idx: number) => {
                             msMap[`${job.jobId}-${idx + 1}`] = m.title || `Milestone #${idx + 1}`;
                         });
                     }
                 }
                 if (active) {
-                    metadataMapRef.current = { jobs: jobsMap, milestones: msMap };
+                    setMetadataMap({ jobs: jobsMap, milestones: msMap });
                 }
             } catch (err) {
                 console.error("Failed to load metadata lookup mapping:", err);
@@ -370,8 +371,8 @@ export default function ActivityView({ setView }: ActivityViewProps) {
 
     // Helper text formattings
     function getEventMessage(e: ParsedEvent) {
-        const jobs = metadataMapRef.current.jobs;
-        const milestones = metadataMapRef.current.milestones;
+        const jobs = metadataMap.jobs;
+        const milestones = metadataMap.milestones;
 
         const jobName = jobs[e.jobId] ? `"${jobs[e.jobId]}"` : `Contract #${e.jobId}`;
         const msName = milestones[`${e.jobId}-${e.milestoneId}`]

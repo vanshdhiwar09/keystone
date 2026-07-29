@@ -8,7 +8,7 @@ export interface JobMetadataPayload {
     freelancerAddress: string;
     milestones: { title: string; description: string; amount?: number }[];
     timestamp: number;
-    signedMessage: string | any;
+    signedMessage: string;
 }
 
 /**

@@ -164,6 +164,7 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
             setState({ step: "submitting", title: "Step 1 of 3: Create Job", sub: "Submitting transaction...", progress: 20 });
 
             const submittedCreate = await server.sendTransaction(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 TransactionBuilder.fromXDR(signedCreate, "Test SDF Network ; September 2015") as any
             );
 
@@ -175,6 +176,7 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
             const confirmedCreate = await pollTx(submittedCreate.hash);
 
             // ── Proven extraction: read returnValue directly from pollTx result ──
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const rpcVal = (confirmedCreate as any).returnValue;
             const xdrVal = typeof rpcVal === "string"
                 ? xdr.ScVal.fromXDR(rpcVal, "base64")
@@ -210,6 +212,7 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
                 setState({ step: "submitting", title: `Step 2 of 3: Milestone ${i + 1}/${milestones.length}`, sub: "Submitting transaction...", progress: progress1 + 5 });
 
                 const submittedAdd = await server.sendTransaction(
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     TransactionBuilder.fromXDR(signedAdd, "Test SDF Network ; September 2015") as any
                 );
                 if (submittedAdd.status !== "PENDING") throw new Error(`add_milestone failed: ${submittedAdd.status}`);
@@ -237,6 +240,7 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
                 setState({ step: "submitting", title: `Step 2 of 3: Funding Milestone ${i + 1}`, sub: "Submitting transaction...", progress: progress2 + 5 });
 
                 const submittedFund = await server.sendTransaction(
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     TransactionBuilder.fromXDR(signedFund, "Test SDF Network ; September 2015") as any
                 );
                 if (submittedFund.status !== "PENDING") throw new Error(`fund_milestone failed: ${submittedFund.status}`);
@@ -250,11 +254,11 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
 
             const ts = Date.now();
             const proofMsg = `Keystone job creation: job=${jobId} client=${publicKey} ts=${ts}`;
-            const sigResult = await signMessage(proofMsg, { address: publicKey });
+            const sigResult = (await signMessage(proofMsg, { address: publicKey })) as string | { signedMessage?: string } | null | undefined;
             if (!sigResult || (typeof sigResult !== "string" && !sigResult.signedMessage)) {
                 throw new Error("User declined to sign");
             }
-            const sigBytes = typeof sigResult === "string" ? sigResult : sigResult.signedMessage;
+            const sigBytes = typeof sigResult === "string" ? sigResult : (sigResult.signedMessage || "");
 
             setState({ step: "submitting", title: "Indexing metadata…", sub: "Submitting transaction...", progress: 90 });
 
@@ -279,6 +283,7 @@ export default function CreateJobFlow({ setView }: { setView?: (v: string) => vo
             setState({ step: "confirmed", title: "Contract Deployed", sub: "Transaction completed.", progress: 100 });
             setDeployed(true);
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
             console.error("Deploy error details (developer console):", e);
             dismissToast(toastId);

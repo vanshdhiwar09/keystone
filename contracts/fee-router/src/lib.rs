@@ -53,7 +53,7 @@ impl FeeRouterContract {
             .instance()
             .get(&ESCROW_ADDR)
             .ok_or(FeeRouterError::NotInitialized)?;
-        
+
         escrow.require_auth();
 
         let platform: Address = env
@@ -61,7 +61,7 @@ impl FeeRouterContract {
             .instance()
             .get(&PLATFORM_ADDR)
             .ok_or(FeeRouterError::NotInitialized)?;
-            
+
         let payout: Address = env
             .storage()
             .instance()
@@ -81,14 +81,14 @@ impl FeeRouterContract {
         if freelancer_amount > 0 {
             // Forward capital specifically into the execution bridge natively
             token_client.transfer(&contract_address, &payout, &freelancer_amount);
-            
+
             // Bridge cross-contract triggering explicit SDK auth limits recursively ensuring bounds!
             let payout_client = PayoutContractClient::new(&env, &payout);
             payout_client.execute_payout(&token, &freelancer, &freelancer_amount);
         }
-        
+
         Ok(())
     }
 }
- 
-mod test; 
+
+mod test;

@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{Env, testutils::Address as _, token};
+use soroban_sdk::{testutils::Address as _, token, Env};
 
 fn create_token_contract<'a>(env: &Env, admin: &Address) -> token::Client<'a> {
     let sac = env.register_stellar_asset_contract_v2(admin.clone());
@@ -16,7 +16,7 @@ fn test_payout_reinitialization_rejection() {
     let router_addr = Address::generate(&env);
 
     client.init_payout(&router_addr);
-    
+
     let result = client.try_init_payout(&router_addr);
     assert_eq!(result, Err(Ok(PayoutError::AlreadyInitialized)));
 }
@@ -35,12 +35,12 @@ fn test_payout_successful_transfer() {
     let token_admin = Address::generate(&env);
     let token = create_token_contract(&env, &token_admin);
     let token_admin_client = token::StellarAssetClient::new(&env, &token.address);
-    
+
     // Mint tokens directly to Payout contract (simulating what FeeRouter does natively)
     token_admin_client.mint(&payout_id, &1000);
 
     let freelancer_addr = Address::generate(&env);
-    
+
     client.execute_payout(&token.address, &freelancer_addr, &1000);
 
     // Verify Payout balance perfectly clears itself natively to exactly zero!

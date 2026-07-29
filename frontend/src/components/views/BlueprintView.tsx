@@ -21,7 +21,17 @@ function truncate(s: string) { return s ? `${s.slice(0, 6)}…${s.slice(-4)}` : 
 
 type MsStatus = "approved" | "disputed" | "active" | "pending";
 
-function getMilestoneStatus(ms: any): MsStatus {
+interface ChainMilestone {
+    status: string;
+}
+
+interface ChainJob {
+    client: string;
+    freelancer: string;
+    milestones: ChainMilestone[];
+}
+
+function getMilestoneStatus(ms: ChainMilestone | null | undefined): MsStatus {
     const s = String(ms?.status ?? "").toLowerCase();
     if (s.includes("approve") || s.includes("release") || s.includes("submitted")) return "approved";
     if (s.includes("dispute") || s.includes("refund")) return "disputed";
@@ -37,7 +47,7 @@ function stoneBlockClass(status: MsStatus): string {
     return "stone-block";                                              // default/pending
 }
 
-function stageLabel(status: MsStatus, index: number, raw: any): string {
+function stageLabel(status: MsStatus, index: number, raw: ChainMilestone | null | undefined): string {
     const rawStr = String(raw?.status ?? "").toLowerCase();
     let labelSuffix = "";
     if (rawStr === "created") {
@@ -85,6 +95,7 @@ function RaiseDisputeModal({
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
         // Lock background scrolling
         document.body.style.overflow = "hidden";
@@ -144,6 +155,7 @@ function RaiseDisputeModal({
                 throw new Error("User declined to sign");
             }
             const submitTx = await server.sendTransaction(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 TransactionBuilder.fromXDR(signedTxXdr, passphrase) as any
             );
             if (submitTx.status !== "PENDING") throw new Error(`Submission failed: ${submitTx.status}`);
@@ -163,6 +175,7 @@ function RaiseDisputeModal({
             invalidateJobCache(jobId);
             onSuccess();
             onClose();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
             dismissToast(toastId);
             const userMsg = getFriendlyErrorMessage(e);
@@ -292,15 +305,14 @@ function RaiseDisputeModal({
 // ── Per-Milestone Action Row ──────────────────────────────────────────────────
 
 function MilestoneActions({
-    jobId, milestoneIndex, status, role,
+    jobId, milestoneIndex, role,
     milestoneTitle, chainMs, onRaiseDispute, onSuccess
 }: {
     jobId: number;
     milestoneIndex: number;
-    status: MsStatus;
     role: "client" | "freelancer" | "observer" | "arbiter";
     milestoneTitle: string;
-    chainMs: any;
+    chainMs: ChainMilestone | null | undefined;
     onRaiseDispute: (index: number, title: string) => void;
     onSuccess: () => void;
 }) {
@@ -313,6 +325,7 @@ function MilestoneActions({
         ? "Test SDF Network ; September 2015"
         : "Public Global Stellar Network ; September 2015";
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async function exec(fn: () => Promise<any>, label: string) {
         if (working || !publicKey) return;
         setWorking(true);
@@ -328,6 +341,7 @@ function MilestoneActions({
             }
             setMsg("Submitting transaction...");
             const submitTx = await server.sendTransaction(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 TransactionBuilder.fromXDR(signedTxXdr, passphrase) as any
             );
             if (submitTx.status !== "PENDING") throw new Error(`Submission failed: ${submitTx.status}`);
@@ -341,6 +355,7 @@ function MilestoneActions({
                 setMsg("");
                 onSuccess();
             }, 1200);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
             dismissToast(toastId);
             const userMsg = getFriendlyErrorMessage(e);
@@ -490,25 +505,30 @@ function DetailView({
     onBack: () => void;
 }) {
     const { publicKey } = useWallet();
-    const [chain, setChain] = useState<any>(null);
+    const [chain, setChain] = useState<ChainJob | null>(null);
     const [loading, setLoading] = useState(true);
     const [refresh, setRefresh] = useState(0);
     const [disputeMilestone, setDisputeMilestone] = useState<{ index: number; title: string } | null>(null);
 
     // Fetch rich DB metadata if not passed in (e.g. deep link from dashboard)
-    const [localMeta, setLocalMeta] = useState<JobMetadataPayload | null>(meta);
+    const [fetchedMeta, setFetchedMeta] = useState<JobMetadataPayload | null>(null);
+    const localMeta = meta || fetchedMeta;
     useEffect(() => {
-        if (meta) { setLocalMeta(meta); return; }
-        fetchJobMetadata().then((d: any) => {
-            const all = Array.isArray(d) ? d : (d.jobs ?? []);
-            const found = all.find((j: any) => j.jobId === jobId);
-            if (found) setLocalMeta(found);
+        if (meta) return;
+        fetchJobMetadata().then((d: unknown) => {
+            const all = Array.isArray(d) ? d : ((d as { jobs?: JobMetadataPayload[] }).jobs ?? []);
+            const found = all.find((j: JobMetadataPayload) => j.jobId === jobId);
+            if (found) setFetchedMeta(found);
         }).catch(() => { });
     }, [jobId, meta]);
 
     useEffect(() => {
         let active = true;
-        if (!publicKey) { setLoading(false); return; }
+        if (!publicKey) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         fetchJobData(jobId, publicKey)
             .then(d => { if (active) { setChain(d); setLoading(false); } })
@@ -601,7 +621,6 @@ function DetailView({
                                 <MilestoneActions
                                     jobId={jobId}
                                     milestoneIndex={i}
-                                    status={status}
                                     role={role}
                                     milestoneTitle={ms.title || `Milestone ${i + 1}`}
                                     chainMs={chainMs}
@@ -659,7 +678,7 @@ function RingDone() {
 
 interface ExplorerJob {
     meta: JobMetadataPayload;
-    chain: any;
+    chain: ChainJob | null;
     status: JobStatus;
     loadingStatus: boolean;
 }
@@ -824,14 +843,13 @@ function ExplorerView({ onSelect }: { onSelect: (id: number, meta: JobMetadataPa
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function BlueprintView({
-    setView,
     initialJobId
 }: {
     setView?: (v: string) => void;
     initialJobId?: number;
 }) {
-    const [selected, setSelected] = useState<{ id: number; meta: JobMetadataPayload } | null>(
-        initialJobId !== undefined ? { id: initialJobId, meta: null as any } : null
+    const [selected, setSelected] = useState<{ id: number; meta: JobMetadataPayload | null } | null>(
+        initialJobId !== undefined ? { id: initialJobId, meta: null } : null
     );
 
     return selected ? (

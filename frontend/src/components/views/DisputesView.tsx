@@ -9,12 +9,29 @@ import { useToast } from "../../context/ToastContext";
 
 function truncate(s: string) { return s ? `${s.slice(0, 6)}…${s.slice(-4)}` : "—"; }
 
+interface ChainMilestone {
+    status: string;
+}
+
+interface ChainJob {
+    client: string;
+    freelancer: string;
+    milestones: ChainMilestone[];
+}
+
 interface DisputeEntry {
     job: JobMetadataPayload;
-    chainJob: any;
+    chainJob: ChainJob | null;
     milestoneIndex: number;
-    milestoneMeta: any;
-    chainMs: any;
+    milestoneMeta: {
+        title: string;
+        description: string;
+        amount?: number;
+        disputeTitle?: string;
+        disputeDescription?: string;
+        disputeNotes?: string;
+    } | null;
+    chainMs: ChainMilestone | null;
 }
 
 export default function DisputesView() {
@@ -22,7 +39,7 @@ export default function DisputesView() {
     const { toast, dismissToast, isUserCancellation, getFriendlyErrorMessage } = useToast();
     const [jobs, setJobs] = useState<JobMetadataPayload[]>([]);
     const [loading, setLoading] = useState(true);
-    const [chainData, setChainData] = useState<Record<number, any>>({});
+    const [chainData, setChainData] = useState<Record<number, ChainJob | null>>({});
     const [working, setWorking] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 5;
@@ -39,7 +56,7 @@ export default function DisputesView() {
             setJobs(allJobs);
 
             if (publicKey) {
-                const cData: Record<number, any> = {};
+                const cData: Record<number, ChainJob | null> = {};
                 for (const j of allJobs) {
                     try {
                         cData[j.jobId] = await fetchJobData(j.jobId, publicKey);
@@ -54,6 +71,7 @@ export default function DisputesView() {
         }
     }, [publicKey]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { load(); }, [load]);
 
     // Collect all disputed milestones across all jobs
@@ -75,6 +93,7 @@ export default function DisputesView() {
 
     useEffect(() => {
         if (currentPage > totalPages && totalPages > 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setCurrentPage(totalPages);
         }
     }, [totalDisputes, totalPages, currentPage]);
@@ -97,6 +116,7 @@ export default function DisputesView() {
                 throw new Error("User declined to sign");
             }
             const submitted = await server.sendTransaction(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 TransactionBuilder.fromXDR(signedTxXdr, passphrase) as any
             );
             if (submitted.status !== "PENDING") throw new Error("Submission failed");
@@ -105,6 +125,7 @@ export default function DisputesView() {
             toast.success("Transaction completed.");
             invalidateJobCache(jobId);
             await load();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
             dismissToast(toastId);
             const userMsg = getFriendlyErrorMessage(e);
@@ -266,7 +287,7 @@ export default function DisputesView() {
                                         Milestone Scope
                                     </p>
                                     <p style={{ fontStyle: "italic", fontSize: 14, color: "rgba(22,26,29,0.7)" }}>
-                                        "{d.milestoneMeta.description}"
+                                        &quot;{d.milestoneMeta.description}&quot;
                                     </p>
                                 </div>
                             ) : null}

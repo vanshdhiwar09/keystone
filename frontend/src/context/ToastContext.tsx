@@ -15,8 +15,8 @@ interface ToastContextType {
     toasts: ToastItem[];
     showToast: (message: string, type: ToastType, duration?: number) => string;
     dismissToast: (id: string) => void;
-    isUserCancellation: (error: any) => boolean;
-    getFriendlyErrorMessage: (error: any) => string;
+    isUserCancellation: (error: unknown) => boolean;
+    getFriendlyErrorMessage: (error: unknown) => string;
     toast: {
         success: (msg: string, duration?: number) => string;
         error: (msg: string, duration?: number) => string;
@@ -29,9 +29,10 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 // Detects wallet signature cancellations consistently
-export function isUserCancellation(err: any): boolean {
+export function isUserCancellation(err: unknown): boolean {
     if (!err) return false;
-    const msg = String(err.message || err.error || err || "").toLowerCase();
+    const errorObj = err as Record<string, unknown>;
+    const msg = String(errorObj.message || errorObj.error || err || "").toLowerCase();
     return (
         msg.includes("declined") ||
         msg.includes("cancel") ||
@@ -42,12 +43,13 @@ export function isUserCancellation(err: any): boolean {
 }
 
 // Maps low-level SDK/Stellar errors to user-friendly messages
-export function getFriendlyErrorMessage(err: any): string {
+export function getFriendlyErrorMessage(err: unknown): string {
     if (!err) return "Something went wrong. Please try again.";
     if (isUserCancellation(err)) {
         return "Transaction cancelled.";
     }
-    const msg = String(err.message || err.error || err || "").toLowerCase();
+    const errorObj = err as Record<string, unknown>;
+    const msg = String(errorObj.message || errorObj.error || err || "").toLowerCase();
 
     // 1. Validation Error
     if (msg.includes("bigint") || msg.includes("convert") || msg.includes("format") || msg.includes("validation")) {
@@ -73,8 +75,8 @@ export function getFriendlyErrorMessage(err: any): string {
         msg.includes("distribution failed") ||
         msg.includes("error(contract")
     ) {
-        if (err.message && (err.message.includes("Action failed:") || err.message.includes("Authorization failed:") || err.message.includes("Ledger failure:"))) {
-            return err.message;
+        if (errorObj.message && (String(errorObj.message).includes("Action failed:") || String(errorObj.message).includes("Authorization failed:") || String(errorObj.message).includes("Ledger failure:"))) {
+            return String(errorObj.message);
         }
         return "Contract Error: Action failed on the smart contract.";
     }
@@ -158,9 +160,9 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
     const { id, type, message, duration = 4500 } = toast;
     const [progress, setProgress] = useState(100);
     const hoverRef = useRef<boolean>(false);
-    const startRef = useRef<number>(Date.now());
+    const startRef = useRef<number>(0);
     const remainingRef = useRef<number>(duration);
-    const timerRef = useRef<any>(null);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const onMouseEnter = () => {
         hoverRef.current = true;
@@ -170,6 +172,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
 
     const onMouseLeave = () => {
         hoverRef.current = false;
+        // eslint-disable-next-line react-hooks/purity
         startRef.current = Date.now();
         setupTimer();
     };
@@ -187,17 +190,19 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
             setProgress((newRemaining / duration) * 100);
 
             if (newRemaining <= 0) {
-                clearInterval(timerRef.current);
+                if (timerRef.current) clearInterval(timerRef.current);
                 onDismiss(id);
             }
         }, interval);
     };
 
     useEffect(() => {
+        startRef.current = Date.now();
         setupTimer();
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, type]);
 
     // Keyboard dismissal

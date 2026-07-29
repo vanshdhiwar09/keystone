@@ -15,6 +15,7 @@ export default function MobileGuidanceModal({ isOpen, onClose }: MobileGuidanceM
         if (typeof window !== "undefined") {
             const userAgent = navigator.userAgent || "";
             if (/iPhone|iPad|iPod/i.test(userAgent)) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setPlatform("ios");
             } else if (/Android/i.test(userAgent)) {
                 setPlatform("android");
@@ -126,7 +127,7 @@ export default function MobileGuidanceModal({ isOpen, onClose }: MobileGuidanceM
                         flexDirection: "column",
                         gap: "8px"
                     }}>
-                        <li>Copy this page's URL using the button below.</li>
+                        <li>Copy this page&apos;s URL using the button below.</li>
                         <li>Open the <strong>Freighter Mobile App</strong>.</li>
                         {platform === "ios" ? (
                             <li>

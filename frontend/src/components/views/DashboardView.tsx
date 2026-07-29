@@ -78,13 +78,20 @@ function HeroArch() {
     );
 }
 
-function truncate(str: string) { return str ? `${str.slice(0, 4)}…${str.slice(-4)}` : "—"; }
+interface ChainMilestone {
+    status: string;
+}
 
+interface ChainJob {
+    client: string;
+    freelancer: string;
+    milestones: ChainMilestone[];
+}
 
-function getMilestoneProgress(meta: JobMetadataPayload, chainData: any) {
+function getMilestoneProgress(meta: JobMetadataPayload, chainData: ChainJob | null) {
     const total = meta.milestones?.length ?? 0;
     if (!total || !chainData?.milestones) return { done: 0, total };
-    const done = chainData.milestones.filter((m: any) => {
+    const done = chainData.milestones.filter((m: ChainMilestone) => {
         const s = String(m?.status ?? "").toLowerCase();
         return s.includes("approve") || s.includes("release");
     }).length;
@@ -93,7 +100,7 @@ function getMilestoneProgress(meta: JobMetadataPayload, chainData: any) {
 
 interface DashboardJob {
     meta: JobMetadataPayload;
-    chain: any;
+    chain: ChainJob | null;
     status: JobStatus;
 }
 
