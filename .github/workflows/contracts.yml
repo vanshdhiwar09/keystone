@@ -88,25 +88,42 @@ jobs:
     needs: compile-and-test
     runs-on: ubuntu-latest
     # Only allow smart contract deployment on pushes to the default branch (master)
-    # and only when the required GitHub Secret is present. Never deploy on pull requests.
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push' && secrets.STELLAR_ADMIN_SECRET != ''
+    # Never deploy on pull requests.
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
+      - name: Check secret presence
+        id: check_secret
+        env:
+          STELLAR_ADMIN_SECRET: ${{ secrets.STELLAR_ADMIN_SECRET }}
+        run: |
+          if [ -z "$STELLAR_ADMIN_SECRET" ]; then
+            echo "Secret STELLAR_ADMIN_SECRET is missing. Skipping deployment steps."
+            echo "has_secret=false" >> $GITHUB_OUTPUT
+          else
+            echo "Secret STELLAR_ADMIN_SECRET is present. Proceeding with deployment..."
+            echo "has_secret=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check out repository
+        if: steps.check_secret.outputs.has_secret == 'true'
         uses: actions/checkout@v4
 
       - name: Download Build Artifacts
+        if: steps.check_secret.outputs.has_secret == 'true'
         uses: actions/download-artifact@v4
         with:
           name: soroban-contracts
           path: target/wasm32-unknown-unknown/release
 
       - name: Install Stellar CLI
+        if: steps.check_secret.outputs.has_secret == 'true'
         id: install-cli
         run: |
           curl -fsSL https://github.com/stellar/stellar-cli/raw/main/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Authenticate and Deploy to Stellar Testnet
+        if: steps.check_secret.outputs.has_secret == 'true'
         id: deploy
         env:
           STELLAR_ADMIN_SECRET: ${{ secrets.STELLAR_ADMIN_SECRET }}
@@ -116,7 +133,7 @@ jobs:
           echo "Contracts successfully staged for Testnet deployment verification."
 
       - name: Generate Deploy Summary
-        if: always()
+        if: always() && steps.check_secret.outputs.has_secret == 'true'
         run: |
           echo "### Testnet Deployment Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
