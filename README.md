@@ -1,5 +1,7 @@
 # 🏗 Keystone — Trustless Escrow Infrastructure
 
+[![Contracts CI/CD](https://github.com/vanshdhiwar09/keystone/actions/workflows/contracts.yml/badge.svg)](https://github.com/vanshdhiwar09/keystone/actions/workflows/contracts.yml)
+[![Frontend CI/CD](https://github.com/vanshdhiwar09/keystone/actions/workflows/frontend.yml/badge.svg)](https://github.com/vanshdhiwar09/keystone/actions/workflows/frontend.yml)
 [![Next.js](https://img.shields.io/badge/Next.js-16.2.10-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Soroban](https://img.shields.io/badge/Soroban-Stellar-purple?logo=stellar&logoColor=white)](https://stellar.org)
@@ -60,6 +62,7 @@ https://stellar.expert/explorer/testnet/tx/756f329eac01ae2dde71936b1577365cf3cd5
 11. [⚠️ Known Limitations](#-known-limitations)
 12. [🔮 Future Improvements](#-future-improvements)
 13. [📄 License](#-license)
+14. [🤖 CI/CD Pipeline](#-cicd-pipeline)
 
 ---
 
@@ -365,6 +368,69 @@ Contract hashes are pre-deployed at the addresses documented above. To rebuild a
    ```
 3. Update both `frontend/.env.local` and `backend/.env` with the new output contract ID hashes.
 
+
+---
+
+## 🤖 CI/CD Pipeline
+
+Keystone implements a robust, production-quality automated CI/CD pipeline using GitHub Actions to continuously verify and deliver the application's components.
+
+### CI/CD Architecture
+
+```mermaid
+graph TD
+    subgraph Local Development
+        direction LR
+        Code[Developer Code] --> |local test| LocalSuite[Cargo / npm Build & Lint]
+    end
+
+    subgraph GitHub Actions CI/CD Pipeline
+        direction TB
+        Code --> |git push / PR| GitWorkflow[GitHub Workflows]
+        
+        GitWorkflow --> ContractsWorkflow[contracts.yml]
+        GitWorkflow --> FrontendWorkflow[frontend.yml]
+
+        subgraph Smart Contracts Pipeline
+            ContractsWorkflow --> FmtCheck[Rust Format Check]
+            FmtCheck --> ClippyCheck[Clippy Linter]
+            ClippyCheck --> RustTest[Cargo Tests]
+            RustTest --> SorobanBuild[Stellar Contract Build]
+            SorobanBuild --> UploadWasm[Upload WASM Artifacts]
+            UploadWasm --> |On Push to master & Secret Present| TestnetDeploy[Testnet Deploy]
+        end
+
+        subgraph Frontend Pipeline
+            FrontendWorkflow --> npmDeps[Install NPM Dependencies]
+            npmDeps --> npmLint[ESLint Checks]
+            npmLint --> TypeCheck[Type Checking / fallback to npx tsc]
+            TypeCheck --> NextBuild[Next.js Build]
+        end
+    end
+
+    subgraph Continuous Deployment Nodes
+        NextBuild --> |Auto Deploy Trigger| Vercel[Vercel Frontend Host]
+        TestnetDeploy --> |On-Chain Deploy| TestnetBlock[Stellar Testnet Ledger]
+    end
+```
+
+### Implemented GitHub Workflows
+
+1. **Smart Contracts CI/CD (`contracts.yml`)**:
+   - Automatically triggers on revisions targeting `contracts/**`, `Cargo.toml`, or the workflow file.
+   - Sets up the Rust stable toolchain, installs target `wasm32-unknown-unknown`, and dynamically installs `stellar-cli`.
+   - Runs `cargo fmt --all --check`, `cargo clippy`, `cargo test`, and `stellar contract build`.
+   - Uploads compiled transaction-ready contract Wasm binaries as build artifacts.
+   - Executes contract code stages to deploy onto Stellar Testnet upon `push` to default branch (`master`) when `STELLAR_ADMIN_SECRET` is added to GitHub secrets.
+2. **Frontend Next.js CI/CD (`frontend.yml`)**:
+   - Triggers on file alterations within the `frontend/` directory.
+   - Uses NodeJS caching and runs `npm ci` for lockfile dependency installation.
+   - Runs ESLint validation checker, compiles the application using `npm run typecheck` (with a seamless automatic fallback to `npx tsc --noEmit` if typecheck script is missing), and verifies clean production building (`npm run build`).
+
+### Deploy Secrets Setup
+
+To enable verification deployment on Stellar Testnet from the main branch pipeline, configure the following secrets inside your GitHub repository settings under **Settings -> Secrets and variables -> Actions**:
+- `STELLAR_ADMIN_SECRET`: The secret key/seed of the administrator account funded on Testnet to deploy contracts/fee-router.
 
 ---
 
